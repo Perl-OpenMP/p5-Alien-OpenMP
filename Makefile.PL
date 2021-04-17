@@ -2,30 +2,28 @@ use strict;
 use warnings;
 use ExtUtils::MakeMaker;
 
-my $repo = 'mohawk2/data-prepare';
-(my $file = (my $pkg = 'Data::Prepare')) =~ s#::#/#g;
+my $repo = 'oodler577/p5-Alien-OpenMP';
+(my $file = (my $pkg = 'Alien::OpenMP')) =~ s#::#/#g;
 $file = "lib/$file.pm";
 WriteMakefile(
   NAME         => $pkg,
   VERSION_FROM => $file,
   ABSTRACT_FROM => $file,
-  AUTHOR           => q{Ed J <etj@cpan.org>},
+  AUTHOR           => q{OODLER 577 <oodler@cpan.org>},
   LICENSE          => 'artistic_2',
-  MIN_PERL_VERSION => '5.008003', # first with right Exporter
+  MIN_PERL_VERSION => '5.010001',
   CONFIGURE_REQUIRES => {
     'ExtUtils::MakeMaker' => '7.10',
   },
   TEST_REQUIRES => {
-    'Test::Snapshot' => '0.06',
   },
   PREREQ_PM => {
-    'Exporter' => '5.57', # importable 'import'
   },
   META_MERGE => {
     "meta-spec" => { version => 2 },
     dynamic_config => 0,
     resources => {
-      x_IRC => 'irc://irc.perl.org/#graphql-perl',
+      x_IRC => 'irc://irc.perl.org/#pdl',
       repository => {
         type => 'git',
         url => "git\@github.com:$repo.git",
