@@ -22,8 +22,6 @@ jobs:
     container: perl:${{ matrix.perl-version }}
     steps:
       - uses: actions/checkout@v2
-      - run: apt-get -y update && apt-get -y upgrade
-      - run: apt-get -y install build-essential libgomp1
       - run: cpanm Devel::CheckLib ExtUtils::MakeMaker
       - name: make module available for testing
         run: cpanm -n --with-recommends --installdeps .
