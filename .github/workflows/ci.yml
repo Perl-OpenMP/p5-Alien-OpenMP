@@ -23,8 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: cpanm Devel::CheckLib ExtUtils::MakeMaker
-      - name: make module available for testing
-        run: cpanm -n --with-recommends --installdeps .
+      - run: cpanm -n --with-recommends --installdeps .
       - run: perl -V
       - name: Run release tests # before others as may install useful stuff
         if: ${{ matrix.release-test }}
