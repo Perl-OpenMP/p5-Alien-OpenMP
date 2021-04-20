@@ -12,7 +12,7 @@ my @SUPPORTED_CCNAMES = (qw/gcc/);
 _assert_supported_environment( $Config::Config{ccname} );
 
 my $repo = 'oodler577/p5-Alien-OpenMP';
-( my $file = ( my $pkg = 'Alien::OpenMP' ) ) =~ s#::#/#g;
+(my $file = (my $pkg = 'Alien::OpenMP')) =~ s#::#/#g;
 $file = "lib/$file.pm";
 WriteMakefile(
     NAME               => $pkg,
