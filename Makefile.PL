@@ -2,7 +2,6 @@ use strict;
 use warnings;
 use ExtUtils::MakeMaker;
 use Devel::CheckLib;
-use FindBin qw/$Bin/;
 use lib q{lib};
 use Config ();
 
