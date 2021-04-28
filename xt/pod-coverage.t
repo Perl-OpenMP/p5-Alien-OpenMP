@@ -2,6 +2,7 @@ use strict;
 use warnings;
 use Test::More;
 
+# only invoked currently on Githun CI
 unless ( $ENV{RELEASE_TESTING} ) {
     plan( skip_all => "Author tests not required for installation" );
 }

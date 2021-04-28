@@ -1,3 +1,4 @@
+# Avoid Inline::C temp files
 ^_Inline
 
 # Avoid version control files.

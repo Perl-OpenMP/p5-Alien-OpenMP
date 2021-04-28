@@ -30,6 +30,7 @@ jobs:
         env:
           RELEASE_TESTING: 1
         run: |
+          apt-get update && apt-get install -y libfile-copy-recursive-perl
           cpanm -n --installdeps --with-develop .
           prove -lr xt
       - name: Run tests (no coverage)
