@@ -1,3 +1,5 @@
+^_Inline
+
 # Avoid version control files.
 ,v$
 \B\.cvsignore$
