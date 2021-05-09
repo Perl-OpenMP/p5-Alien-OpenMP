@@ -64,15 +64,6 @@ WriteMakefile(
     },
 );
 
-sub MY::postamble {
-    <<EOF;
-pure_all :: README.md
-
-README.md : \$(VERSION_FROM)
-\tpod2markdown \$< >\$\@
-EOF
-}
-
 # OpenMP specific assertion that leverages Devel::CheckLib and
 # information that should be provided for the compiler being test
 # but the Alien::OpenMP module itself
