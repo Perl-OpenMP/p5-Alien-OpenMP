@@ -24,10 +24,16 @@ WriteMakefile(
         'ExtUtils::MakeMaker' => 0,
         'Devel::CheckLib'     => 0,
     },
+    BUILD_REQUIRES => {
+        'ExtUtils::MakeMaker' => 0,
+        'Devel::CheckLib'     => 0,
+    },
     TEST_REQUIRES => {
-        'Test::More' => 0,
+        'Test::More'      => 0,
+        'Devel::CheckLib' => 0,
     },
     PREREQ_PM => {
+        'Test::More' => 0,
         'Devel::CheckLib' => 0,
     },
     META_MERGE => {
@@ -53,6 +59,8 @@ WriteMakefile(
                     'Test::Pod'           => '1.00',
                     'Pod::Markdown'       => 0,
                     'Inline::C'           => 0,
+                    'Devel::CheckLib'     => 0,
+		    'Dist::Zilla'         => 0,
                 },
             },
             test => {
