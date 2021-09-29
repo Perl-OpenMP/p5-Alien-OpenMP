@@ -1,19 +1,24 @@
+BEGIN {
+  # https://bugs.llvm.org/show_bug.cgi?id=50579
+  $ENV{LIBOMP_USE_HIDDEN_HELPER_TASK} = $ENV{LIBOMP_NUM_HIDDEN_HELPER_THREADS} = 0 if $^O eq 'darwin';
+}
 use strict;
 use warnings;
-use Test::More tests => 9;
-
-use FindBin qw/$Bin/;
-use lib qq{$Bin/../lib};
-
+use Test::More;
 use Alien::OpenMP;
+use File::Temp ();
 use Inline (
     C           => 'DATA',
     with        => qw/Alien::OpenMP/,
+    directory   => (my $tmp = File::Temp::tempdir()),
+    build_noisy => !!$ENV{HARNESS_IS_VERBOSE}
 );
 
 for my $num_threads (qw/1 2 4 8 16 32 64 128 256/) {
     is test($num_threads), $num_threads, qq{Ensuring compiled OpenMP program works as expected. Threads = $num_threads};
 }
+
+done_testing;
 
 __DATA__
 

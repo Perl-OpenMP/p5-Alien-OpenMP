@@ -54,3 +54,4 @@
 ^xt/
 ^nytprof\.out
 ^nytprof/
+^\.proverc$
