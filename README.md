@@ -77,7 +77,7 @@ module do not have access to an unsupported compiler.
 
     Returns flag used by a supported compiler to enable OpenMP. If not support,
     an empty string is provided since by definition all OpenMP programs
-    must compile because OpenMP pramgas are annotations hidden behind source
+    must compile because OpenMP pragmas are annotations hidden behind source
     code comments.
 
     Example, GCC uses, `-fopenmp`.
