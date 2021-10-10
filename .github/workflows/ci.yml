@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        perl-version: ['5.8', '5.10', '5.14', '5.20', '5.28', '5.32']
+        perl-version: ['5.10', '5.14', '5.20', '5.28', '5.32']
         include:
           - perl-version: '5.30'
             os: ubuntu-latest
@@ -22,9 +22,13 @@ jobs:
     container: perl:${{ matrix.perl-version }}
     steps:
       - uses: actions/checkout@v2
-      - run: cpanm Devel::CheckLib ExtUtils::MakeMaker
+      - run: cpanm -n ExtUtils::MakeMaker Alien::Build
       - run: cpanm -n --with-recommends --installdeps .
       - run: perl -V
+      - name: Build
+        run: |
+          perl Makefile.PL
+          make
       - name: Run release tests # before others as may install useful stuff
         if: ${{ matrix.release-test }}
         env:
@@ -32,17 +36,19 @@ jobs:
         run: |
           apt-get update && apt-get install -y libfile-copy-recursive-perl
           cpanm -n --installdeps --with-develop .
-          prove -lr xt
+          prove -brj4 xt
       - name: Run tests (no coverage)
         if: ${{ !matrix.coverage }}
-        run: prove -l -j4 t
+        run: prove -brj4 t
       - name: Run tests (with coverage)
         if: ${{ matrix.coverage }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TESTING: 1
         run: |
           cpanm -n Devel::Cover::Report::Coveralls
-          HARNESS_OPTIONS='j4' cover -test -report Coveralls
+          HARNESS_PERL_SWITCHES='-MDevel::Cover=-delete,-ignore,Alien/OpenMP/Install/Files\\.pm$' prove -brj4 t xt
+          cover -report Coveralls
   non-linux:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -59,4 +65,24 @@ jobs:
           args: -n --installdeps .
       - run: perl -V
       - name: Run tests
-        run: prove -l -j4 t
+        run: |
+          perl Makefile.PL
+          make
+          prove -brj4 t
+  darwin:
+    runs-on: macOS-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Perl
+        run: brew install perl libomp
+      - name: perl -V
+        run: perl -V
+      - name: Install Dependencies
+        run: |
+          curl -L https://cpanmin.us | tee cpanm | perl - -n ExtUtils::MakeMaker Alien::Build Inline Inline::C
+          perl ./cpanm -n --installdeps .
+      - name: Run Tests
+        run: |
+          perl Makefile.PL
+          make
+          prove -brv t xt

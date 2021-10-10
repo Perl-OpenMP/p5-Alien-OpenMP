@@ -3,6 +3,7 @@
 *.old
 *.swp
 /*.tar.gz
+/_alien/
 /blib/
 /cover_db
 /inc/

@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use Test::More;
 
-# only invoked currently on Githun CI
+# only invoked currently on Github CI
 unless ( $ENV{RELEASE_TESTING} ) {
     plan( skip_all => "Author tests not required for installation" );
 }
@@ -20,4 +20,4 @@ eval "use Pod::Coverage $min_pc";
 plan skip_all => "Pod::Coverage $min_pc required for testing POD coverage"
     if $@;
 
-all_pod_coverage_ok({ trustme => [qr/^(final|got)/], coverage_class => 'Pod::Coverage::CountParents' });
+all_pod_coverage_ok({ trustme => [qr/^(final|got|Inline)/], coverage_class => 'Pod::Coverage::CountParents' });
