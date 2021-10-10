@@ -39,6 +39,13 @@ At this time, the following compilers are supported:
 
         gcc -fopenmp ./my-openmp.c -o my-openmp.x
 
+- `clang` EXPERIMENTAL
+
+    `-fopenmp` enables OpenMP support via compiler and linker in recent
+    versions of `clang`. MacOS shipped versions are missing the library
+    which needs installing either with [Homebrew](https://brew.sh) or
+    [Macports](https://www.macports.org).
+
 ## Note On Compiler Support
 
 If used for an unsupported compiler, `ExtUtils::MakeMaker::os_unsupported`
@@ -89,7 +96,8 @@ module do not have access to an unsupported compiler.
     OpenMP programs with `Inline::C`:
 
         use Alien::OpenMP; use Inline (
-            C           => 'DATA', with        => qw/Alien::OpenMP/,
+            C           => 'DATA',
+            with        => qw/Alien::OpenMP/,
         );
 
     The nice, compact form above replaces this mess:
@@ -99,22 +107,6 @@ module do not have access to an unsupported compiler.
             lddlflags   => join( q{ }, $Config::Config{lddlflags},
             Alien::OpenMP::lddlflags() ),
         );
-
-- `_check_libs`
-
-    Internal method.
-
-    Returns an array reference of libraries, e.g., `gomp` for `gcc`. It is
-    meant specifically as an internal method to support [Devel::CheckLib](https://metacpan.org/pod/Devel%3A%3ACheckLib)
-    in this module's `Makefile.PL`.
-
-- `_check_headers`
-
-    Internal method.
-
-    Returns an array reference of header files, e.g., `omp.h` for `gcc`. It
-    is meant specifically as an internal method to support [Devel::CheckLib](https://metacpan.org/pod/Devel%3A%3ACheckLib)
-    in this module's `Makefile.PL`.
 
 # AUTHOR
 
