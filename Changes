@@ -1,3 +1,6 @@
+{{$NEXT}}
+- support clang, use Alien::Build - thanks @kiwiroy
+
 0.003002 2021-05-20
 - fixed Makefile.PL (again)..
   made sure Devel::CheckLib is added
