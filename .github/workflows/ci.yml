@@ -22,8 +22,7 @@ jobs:
     container: perl:${{ matrix.perl-version }}
     steps:
       - uses: actions/checkout@v2
-      - run: cpanm -n ExtUtils::MakeMaker Alien::Build
-      - run: cpanm -n --with-recommends --installdeps .
+      - run: cpanm -n ExtUtils::MakeMaker Alien::Build Inline Inline::C
       - run: perl -V
       - name: Build
         run: |
