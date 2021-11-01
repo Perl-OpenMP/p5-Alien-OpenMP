@@ -1,3 +1,7 @@
+0.003005  2021-10-31 21:46:06+01:00 Europe/London
+- Got a nice dist.ini and test update; no functional
+  changes but dist.ini is now proper - thanks, @Grinnz!
+
 0.003004  2021-10-30 21:46:06+01:00 Europe/London
 - Replaced static Makefile.PL with one generated
   using [AlienBuild] and [MakeMaker::Awesome].

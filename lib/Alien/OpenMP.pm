@@ -3,7 +3,7 @@ package Alien::OpenMP;
 use parent 'Alien::Base';
 use Config ();
 
-our $VERSION = '0.003004';
+our $VERSION = '0.003005';
 
 # "public" Alien::Base method implementations
 
