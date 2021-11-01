@@ -16,11 +16,12 @@ configure {
 };
 
 plugin 'Probe::CBuilder' => (
-  cflags  => Alien::OpenMP::configure->cflags,
-  lang    => 'C',
-  libs    => Alien::OpenMP::configure->libs,
-  options => {quiet => 0},
-  program => join("\n" => <DATA>),
+  lang         => 'C',
+  cflags       => Alien::OpenMP::configure->cflags,
+  libs         => Alien::OpenMP::configure->libs,
+  auto_include => Alien::OpenMP::configure->auto_include,
+  options      => {quiet => 0},
+  program      => join("\n" => <DATA>),
 );
 
 after probe => sub {

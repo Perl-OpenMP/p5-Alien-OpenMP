@@ -8,9 +8,22 @@ our $OS     = $^O;
 
 my $checked   = 0;
 my $supported = {
-  gcc   => {cflags => ['-fopenmp'],            libs => ['-fopenmp']},
-  clang => {cflags => ['-Xclang', '-fopenmp'], libs => ['-lomp']},      # this could be -Xpreprocessor
+    gcc => {
+        cflags        => ['-fopenmp'],
+        libs          => ['-fopenmp'],
+        auto_include  => qq{#include <omp.h>},      # Inline::C automatically adds \n
+    },
+    clang => {
+        cflags        => [ '-Xclang', '-fopenmp' ],
+        libs          => ['-lomp'],                 # this could be -Xpreprocessor
+        auto_include  => qq{#include <omp.h>},      # Inline::C automatically adds \n
+    },
 };
+
+sub auto_include {
+  shift->_update_supported;
+  return $supported->{$CCNAME}{auto_include} || q{};
+}
 
 sub cflags {
   shift->_update_supported;
