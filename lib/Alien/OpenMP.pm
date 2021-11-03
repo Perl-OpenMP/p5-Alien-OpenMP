@@ -19,7 +19,7 @@ sub Inline {
   return {
     CCFLAGS       => $self->cflags(),
     LDDLFLAGS     => join( q{ }, $Config::Config{lddlflags}, $self->lddlflags() ),
-    AUTO_INCLUDE  => Alien::OpenMP::configure->auto_include(), # e.g., #include <omp.h>
+    AUTO_INCLUDE  => $self->auto_include(), # e.g., #include <omp.h>
   };
 }
 
