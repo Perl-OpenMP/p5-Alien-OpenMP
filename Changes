@@ -1,6 +1,6 @@
 0.003006  2021-11-01 21:46:06+01:00 Europe/London
 - Updated Inline::C integration via Alien::OpenMP::Inline
-  to provide 'auto_includes', which provides the
+  to provide 'auto_include', which provides the
   line, #include <omp.h>, saving the programmer the
   need to worry about it. It's compiler specific,
   but both supported compilers (gcc, clang) use the
