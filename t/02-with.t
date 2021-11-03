@@ -23,7 +23,7 @@ for my $num_threads (qw/1 2 4 8 16 32 64 128 256/) {
     $ENV{CC} = q{gcc};
     my $config_ref = Alien::OpenMP->Inline;
     like $config_ref->{CCFLAGS},   qr/-fopenmp/, q{inspecting value of CCFLAGS.};
-    like $config_ref->{LDDLFLAGS}, qr/-fopenmp/, q{inspecting value of LDDLFLAGS.};
+    like $config_ref->{LDDLFLAGS},  qr/(?:-lomp|-fopenmp)/, q{inspecting value of LDDLFLAGS.};
     is $config_ref->{AUTO_INCLUDE}, q{#include <omp.h>}, q{inspecting value of AUTO_INCLUDE.};
 }
 
