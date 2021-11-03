@@ -34,9 +34,9 @@ Alien::OpenMP - Encapsulate system info for OpenMP
 =head1 SYNOPSIS
 
     use Alien::OpenMP;
-    say Alien::OpenMP->cflags;        # e.g. '-fopenmp' if gcc 
-    say Alien::OpenMP->lddlflags;     # e.g. '-fopenmp' if gcc 
-    say Alien::OpenMP->auto_includes; # e.g. '#include <omp.h>' if gcc
+    say Alien::OpenMP->cflags;       # e.g. '-fopenmp' if gcc
+    say Alien::OpenMP->lddlflags;    # e.g. '-fopenmp' if gcc
+    say Alien::OpenMP->auto_include; # e.g. '#include <omp.h>' if gcc
 
 =head1 DESCRIPTION
 
@@ -142,7 +142,7 @@ The nice, compact form above replaces this mess:
         C             => 'DATA',
         ccflagsex     => Alien::OpenMP->cflags(),
         lddlflags     => join( q{ }, $Config::Config{lddlflags}, Alien::OpenMP::lddlflags() ),
-        auto_includes => Alien::OpenMP->auto_includes(),
+        auto_include => Alien::OpenMP->auto_include(),
     );
 
 It also means that the standard I<include> for OpenMP is not required in
