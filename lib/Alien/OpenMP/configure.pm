@@ -11,12 +11,12 @@ my $supported = {
     gcc => {
         cflags        => ['-fopenmp'],
         libs          => ['-fopenmp'],
-        auto_include  => qq{#include <omp.h>},      # Inline::C automatically adds \n
+        auto_include  => join qq{\n}, ('#include <omp.h>'),
     },
     clang => {
         cflags        => [ '-Xclang', '-fopenmp' ],
         libs          => ['-lomp'],                 # this could be -Xpreprocessor
-        auto_include  => qq{#include <omp.h>},      # Inline::C automatically adds \n
+        auto_include  => join qq{\n}, ('#include <omp.h>'),
     },
 };
 
