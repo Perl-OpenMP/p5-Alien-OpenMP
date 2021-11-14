@@ -16,8 +16,10 @@ sub lddlflags { shift->libs }
 
 sub Inline {
   my ($self, $lang) = @_;
+  my $params = $self->SUPER::Inline($lang);
+  $params->{CCFLAGSEX} = delete $params->{INC};
   return {
-    CCFLAGS       => $self->cflags(),
+    %$params,
     LDDLFLAGS     => join( q{ }, $Config::Config{lddlflags}, $self->lddlflags() ),
     AUTO_INCLUDE  => $self->runtime_prop->{auto_include},
   };
