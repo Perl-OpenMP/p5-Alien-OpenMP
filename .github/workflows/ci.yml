@@ -64,7 +64,7 @@ jobs:
           distribution: strawberry # ignored non-windows
       - uses: perl-actions/install-with-cpanm@v1
         with:
-          args: -n --installdeps .
+          args: -n --installdeps --with-recommends .
       - run: perl -V
       - name: Run tests
         run: |

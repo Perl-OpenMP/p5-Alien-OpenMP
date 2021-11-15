@@ -5,10 +5,12 @@ BEGIN {
 use strict;
 use warnings;
 use Test::More;
+use Test::Needs 'Inline::C';
 use Alien::OpenMP;
 use File::Temp ();
-use Inline (
-    C           => 'DATA',
+Inline->import(
+    C           => do { local $/ = undef; <DATA> },
+    filters     => [ sub { (my $filt = $_[0]) =~ s/^__C__$//mg; $filt } ],
     with        => qw/Alien::OpenMP/,
     directory   => ( my $tmp = File::Temp::tempdir() ),
     build_noisy => !!$ENV{HARNESS_IS_VERBOSE}
