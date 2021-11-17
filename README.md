@@ -5,8 +5,9 @@ Alien::OpenMP - Encapsulate system info for OpenMP
 # SYNOPSIS
 
     use Alien::OpenMP;
-    say Alien::OpenMP->cflags;    # e.g. -fopenmp if gcc 
-    say Alien::OpenMP->lddlflags; # e.g. -fopenmp if gcc 
+    say Alien::OpenMP->cflags;       # e.g. '-fopenmp' if gcc
+    say Alien::OpenMP->lddlflags;    # e.g. '-fopenmp' if gcc
+    say Alien::OpenMP->auto_include; # e.g. '#include <omp.h>' if gcc
 
 # DESCRIPTION
 
@@ -103,10 +104,14 @@ module do not have access to an unsupported compiler.
     The nice, compact form above replaces this mess:
 
         use Alien::OpenMP; use Inline (
-            C           => 'DATA', ccflagsex   => Alien::OpenMP::cflags(),
-            lddlflags   => join( q{ }, $Config::Config{lddlflags},
-            Alien::OpenMP::lddlflags() ),
+            C             => 'DATA',
+            ccflagsex     => Alien::OpenMP->cflags(),
+            lddlflags     => join( q{ }, $Config::Config{lddlflags}, Alien::OpenMP::lddlflags() ),
+            auto_include => Alien::OpenMP->auto_include(),
         );
+
+    It also means that the standard _include_ for OpenMP is not required in
+    the `C` code, i.e., `#include <omp.h>`.
 
 # AUTHOR
 
