@@ -7,20 +7,6 @@ use Alien::OpenMP::configure;
 use Path::Tiny;
 use Capture::Tiny qw(capture);
 
-plan skip_all => "Author tests not required for installation" unless !!$ENV{RELEASE_TESTING};
-
-# Author test for the configure module.
-
-# dev note 1: add a new lexically scoped blockfor each
-# 'ccname' that gets added to Alien::OpenMP; please
-# don't get fancy and create a loop.
-
-# dev note 2: this test is not dependent on the
-# environment, see the use of a local'd version of
-# %Config::Config below for a hint on how to properly
-# add additional tests as compiler support is added to
-# this module.
-
 subtest 'CC environment variable' => sub {
   local $Alien::OpenMP::configure::OS = 'linux';
   Alien::OpenMP::configure->_reset;
@@ -50,6 +36,8 @@ subtest 'darwin clang/gcc homebrew' => sub {
 };
 
 subtest 'darwin clang/gcc macports' => sub {
+  plan skip_all => 'Mocking does not work on MSWin32'
+    if $^O eq 'MSWin32';
   local $Alien::OpenMP::configure::CCNAME = 'gcc';
   local $Alien::OpenMP::configure::OS     = 'darwin';
   local $ENV{PATH}                        = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
