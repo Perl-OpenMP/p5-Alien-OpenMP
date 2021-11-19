@@ -96,10 +96,7 @@ module do not have access to an unsupported compiler.
     [Inline](https://metacpan.org/pod/Inline)). This method is not called directly, but used when compiling
     OpenMP programs with `Inline::C`:
 
-        use Alien::OpenMP; use Inline (
-            C           => 'DATA',
-            with        => qw/Alien::OpenMP/,
-        );
+        use Alien::OpenMP; use Inline C => 'DATA', with => q/Alien::OpenMP/;
 
     The nice, compact form above replaces this mess:
 
