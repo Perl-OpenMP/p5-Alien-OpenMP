@@ -11,7 +11,7 @@ use File::Temp ();
 Inline->import(
     C           => do { local $/ = undef; <DATA> },
     filters     => [ sub { (my $filt = $_[0]) =~ s/^__C__$//mg; $filt } ],
-    with        => qw/Alien::OpenMP/,
+    with        => q/Alien::OpenMP/,
     directory   => ( my $tmp = File::Temp::tempdir() ),
     build_noisy => !!$ENV{HARNESS_IS_VERBOSE}
 );

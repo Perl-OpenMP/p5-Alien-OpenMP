@@ -133,10 +133,7 @@ Used in support of L<Inline::C>'s C<with> method (inherited from
 L<Inline>). This method is not called directly, but used when compiling
 OpenMP programs with C<Inline::C>:
 
-    use Alien::OpenMP; use Inline (
-        C           => 'DATA',
-        with        => qw/Alien::OpenMP/,
-    );
+    use Alien::OpenMP; use Inline C => 'DATA', with => q/Alien::OpenMP/;
 
 The nice, compact form above replaces this mess:
 
