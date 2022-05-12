@@ -73,6 +73,22 @@ sub unsupported {
   print "OS Unsupported\n";
 }
 
+sub version_from_preprocessor {
+  my ($self, $lines) = @_;
+  my $define_re = qr/^(?:.*_OPENMP\s)?([0-9]+)$/;
+  my %runtime;
+  ($runtime{openmp_version}) = map { (my $v = $_) =~ s/$define_re/$1/; $v } grep /$define_re/, split m{$/}, $lines;
+  $runtime{version} = _openmp_defined($runtime{openmp_version});
+  return \%runtime;
+}
+
+sub _openmp_defined {
+  my $define = pop;
+  # From https://github.com/jeffhammond/HPCInfo/blob/master/docs/Preprocessor-Macros.md
+  my $versions = {200505 => '2.5', 200805 => '3.0', 201107 => '3.1', 201307 => '4.0', 201511 => '4.5', 201811 => '5.0'};
+  return $versions->{$define || ''} || 'unknown';
+}
+
 # test support only
 sub _reset { $checked = 0; }
 
@@ -158,5 +174,10 @@ L<Alien::Build::Plugin::Probe::CBuilder>.
 Report using L<Alien::Build::Log> or L<warn|https://metacpan.org/pod/perlfunc#warn-LIST> that the compiler/architecture
 combination is unsupported and provide minimal notes on any solutions. There is little to no guarding of the actual
 state of support in this function.
+
+=head2 version_from_preprocessor
+
+Parse the output from the C preprocessor, filtering for the C<#define _OPENMP> to populate a hash with both the value
+and the equivalent decimal version. The keys of the hash are C<openmp_version> and C<version>.
 
 =cut

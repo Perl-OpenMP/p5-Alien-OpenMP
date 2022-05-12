@@ -12,6 +12,8 @@ our $VERSION = '0.003007';
 # remain the case for all supported compilers
 sub lddlflags { shift->libs }
 
+sub openmp_version { shift->runtime_prop->{openmp_version} }
+
 # Inline related methods
 
 sub Inline {
@@ -126,6 +128,19 @@ Returns the flag used by the linker to enable OpenMP. This is usually
 the same as what is returned by C<cflags>.
 
 Example, GCC uses, C<-fopenmp>, for this as well.
+
+=item C<openmp_version>
+
+Returns the version of OpenMP provided by the compiler. The value returned
+is the value of the C<#define _OPENMP>.
+
+For a decimal version consider using L</"version">.
+
+=item C<version>
+
+Return the version of OpenMP provided by the compiler in decimal form. The
+table used is derived from
+L<https://github.com/jeffhammond/HPCInfo/blob/master/docs/Preprocessor-Macros.md>.
 
 =item C<Inline>
 
