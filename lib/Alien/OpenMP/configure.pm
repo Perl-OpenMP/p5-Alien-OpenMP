@@ -48,7 +48,7 @@ sub unsupported {
   # build an array of messages
   my @msg = ("This version of $CCNAME does not support OpenMP");
   if ($CCNAME eq 'gcc' and $OS ne 'darwin') {
-    push @msg, "This could be a bug, please record and issue https://github.com/oodler577/p5-Alien-OpenMP/issues";
+    push @msg, "This could be a bug, please record and issue https://github.com/Perl-OpenMP/p5-Alien-OpenMP/issues";
   }
 
   if ($OS eq 'darwin') {
