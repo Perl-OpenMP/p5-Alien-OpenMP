@@ -14,4 +14,8 @@ subtest 'has options' => sub {
   like +Alien::OpenMP->lddlflags, qr{(?:-lomp|-fopenmp)}, q{Found expected OpenMP linker switch for gcc/clang.};
 };
 
+subtest 'OpenMP version' => sub {
+  like +Alien::OpenMP->openmp_version, qr{^[0-9]{6}$},       q{looks like a dated version};
+  like +Alien::OpenMP->version,        qr{^[0-9]+\.[0-9]+$}, q{looks like a decimal version};
+};
 done_testing;

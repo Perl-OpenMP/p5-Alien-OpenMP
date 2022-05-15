@@ -86,5 +86,30 @@ subtest 'darwin, missing dependencies' => sub {
   like $stderr, qr{Support can be enabled by using Homebrew or Macports}, 'unsupported compiler name';
 };
 
+subtest 'preprocessor parsing' => sub {
+  my $result = Alien::OpenMP::configure->version_from_preprocessor(<<'END_OF_CPP');
+#define _LP64 1
+#define _OPENMP 201811
+#define __GNUC_MINOR__ 2
+#define __GNUC_PATCHLEVEL__ 1
+#define __GNUC_STDC_INLINE__ 1
+#define __GNUC__ 4
+#define __GXX_ABI_VERSION 1002
+#define __USER_LABEL_PREFIX__ _
+#define __VERSION__ "Apple LLVM 12.0.5 (clang-1205.0.22.11)"
+#define __clang_version__ "12.0.5 (clang-1205.0.22.11)"
+
+END_OF_CPP
+  is_deeply $result, {openmp_version => '201811', version => '5.0'}, 'correct version';
+
+  my $unknown = Alien::OpenMP::configure->version_from_preprocessor(<<'END_OF_CPP');
+#define _LP64 1
+#define __GNUC_MINOR__ 2
+#define __GNUC_PATCHLEVEL__ 1
+#define __GNUC_STDC_INLINE__ 1
+#define __GNUC__ 4
+END_OF_CPP
+  is_deeply $unknown, {openmp_version => undef, version => 'unknown'}, 'unknown version';
+};
 
 done_testing;

@@ -1,5 +1,6 @@
 # -*- mode: perl -*-
 use alienfile;
+use Alien::Build::CommandSequence;
 use lib q{lib};
 use Alien::OpenMP::configure;
 no lib q{lib};
@@ -15,6 +16,8 @@ configure {
   }
 };
 
+meta->interpolator->replace_helper(cc => sub { $Alien::OpenMP::configure::CCNAME });
+
 plugin 'Probe::CBuilder' => (
   lang         => 'C',
   cflags       => Alien::OpenMP::configure->cflags,
@@ -28,6 +31,16 @@ after probe => sub {
   my $build = shift;
   $build->install_prop->{'alien_openmp_compiler_has_openmp'} = 1;
   $build->runtime_prop->{auto_include}                       = Alien::OpenMP::configure->auto_include;
+  my $seq = Alien::Build::CommandSequence->new([
+    join(' ', '%{cc}', '-dM', Alien::OpenMP::configure->cflags, '-E', '-', '<', '%{devnull}'),
+    sub {
+      my ($build, $args) = @_;
+      my @props   = qw{openmp_version version};
+      my $runtime = Alien::OpenMP::configure->version_from_preprocessor($args->{out});
+      @{$build->runtime_prop}{@props} = @$runtime{@props};
+    }
+  ]);
+  $seq->execute($build);
 };
 
 share {
