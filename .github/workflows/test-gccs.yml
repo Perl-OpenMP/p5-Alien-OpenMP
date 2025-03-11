@@ -59,6 +59,7 @@ jobs:
 
           perlbrew --verbose --notest install perl-${{ matrix.perl }} -Dcc=$CC
           perlbrew use perl-${{ matrix.perl }}
+          perlbrew install-cpanm
 
           perl -V
           perl -v
