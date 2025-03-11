@@ -57,7 +57,7 @@ jobs:
           export PATH="$PERLBREW_ROOT/bin:$PATH"
           source $HOME/perl5/perlbrew/etc/bashrc
 
-          perlbrew install perl-${{ matrix.perl }} -Dcc=$CC
+          perlbrew --verbose --notest install perl-${{ matrix.perl }} -Dcc=$CC
           perlbrew use perl-${{ matrix.perl }}
 
           perl -V
