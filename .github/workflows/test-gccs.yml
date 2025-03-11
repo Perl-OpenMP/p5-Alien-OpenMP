@@ -8,8 +8,8 @@ jobs:
     strategy:
       fail-fast: false  # Ensure all jobs run even if one fails
       matrix:
-        os: ["ubuntu-latest", "ubuntu-22.04"]
-        perl: ["5.40" ] #, "5.38", "5.36", "5.34", "5.32", "5.30", "5.28", "5.26", "5.24", "5.22", "5.20", "5.18", "5.16", "5.14", "5.12"]
+        os: ["ubuntu-latest"]
+        perl: ["5.40"] #, "5.38", "5.36", "5.34", "5.32", "5.30", "5.28", "5.26", "5.24", "5.22", "5.20", "5.18", "5.16", "5.14", "5.12"]
         gcc: ["13", "11", "9"]  # Different GCC versions to test
 
     name: Perl ${{ matrix.perl }} with GCC-${{ matrix.gcc }} on ${{ matrix.os }}
@@ -17,37 +17,58 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install the requested GCC version
-      - name: Install GCC-${{ matrix.gcc }}
+      # Install the requested GCC version and dependencies
+      - name: Install GCC-${{ matrix.gcc }} and Dependencies
         run: |
           sudo apt update
-          sudo apt install -y gcc-${{ matrix.gcc }} g++-${{ matrix.gcc }}
-          echo "Using GCC version:"
-          gcc-${{ matrix.gcc }} --version
+          sudo apt install -y gcc-${{ matrix.gcc }} g++-${{ matrix.gcc }} build-essential libgomp1 curl
 
-      # Set the selected GCC version as default
-      - name: Configure GCC-${{ matrix.gcc }}
+      # Switch GCC at the OS level using update-alternatives
+      - name: Set GCC-${{ matrix.gcc }} as Default
         run: |
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.gcc }} 100
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.gcc }} 100
-          export CC=/usr/bin/gcc-${{ matrix.gcc }}
-          export CXX=/usr/bin/g++-${{ matrix.gcc }}
+          sudo update-alternatives --set gcc /usr/bin/gcc-${{ matrix.gcc }}
+          sudo update-alternatives --set g++ /usr/bin/g++-${{ matrix.gcc }}
+          
+          export CC=/usr/bin/gcc
+          export CXX=/usr/bin/g++
           echo "CC=$CC" >> $GITHUB_ENV
           echo "CXX=$CXX" >> $GITHUB_ENV
 
-      # Install Perl with the selected GCC
-      - name: Set up Perl
-        uses: shogo82148/actions-setup-perl@v1
-        with:
-          perl-version: ${{ matrix.perl }}
-          distribution: "default"
-          install-option: "-Dcc=${{ env.CC }}"
+          echo "Using system GCC version:"
+          gcc --version
 
-      - run: perl -V
-      - run: perl -v
+      # Install Perlbrew
+      - name: Install Perlbrew
+        run: |
+          curl -L https://install.perlbrew.pl | bash
+          echo 'export PERLBREW_ROOT=$HOME/perl5/perlbrew' >> $HOME/.bashrc
+          echo 'source $HOME/perl5/perlbrew/etc/bashrc' >> $HOME/.bashrc
+          export PERLBREW_ROOT=$HOME/perl5/perlbrew
+          export PATH="$PERLBREW_ROOT/bin:$PATH"
+          source $HOME/perl5/perlbrew/etc/bashrc
+          perlbrew available
+
+      # Install and Use the Requested Perl Version
+      - name: Install Perl ${{ matrix.perl }} with GCC-${{ matrix.gcc }}
+        run: |
+          export PERLBREW_ROOT=$HOME/perl5/perlbrew
+          export PATH="$PERLBREW_ROOT/bin:$PATH"
+          source $HOME/perl5/perlbrew/etc/bashrc
+
+          perlbrew install perl-${{ matrix.perl }} -Dcc=$CC
+          perlbrew use perl-${{ matrix.perl }}
+
+          perl -V
+          perl -v
 
       # Install Required Perl Modules
       - name: Install Required Perl Modules
         run: |
-          cpanm --verbose --notest Inline::C
-          cpanm --verbose Alien::OpenMP
+          export PERLBREW_ROOT=$HOME/perl5/perlbrew
+          export PATH="$PERLBREW_ROOT/bin:$PATH"
+          source $HOME/perl5/perlbrew/etc/bashrc
+          perlbrew use perl-${{ matrix.perl }}
+
+          cpanm --verbose --notest Module::Build Inline::C Alien::OpenMP
