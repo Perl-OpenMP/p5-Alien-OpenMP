@@ -1,0 +1,53 @@
+name: Perl CI with Inline::C and OpenMP
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false  # Ensure all jobs run even if one fails
+      matrix:
+        os: ["ubuntu-latest", "ubuntu-22.04"]
+        perl: ["5.40" ] #, "5.38", "5.36", "5.34", "5.32", "5.30", "5.28", "5.26", "5.24", "5.22", "5.20", "5.18", "5.16", "5.14", "5.12"]
+        gcc: ["13", "11", "9"]  # Different GCC versions to test
+
+    name: Perl ${{ matrix.perl }} with GCC-${{ matrix.gcc }} on ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install the requested GCC version
+      - name: Install GCC-${{ matrix.gcc }}
+        run: |
+          sudo apt update
+          sudo apt install -y gcc-${{ matrix.gcc }} g++-${{ matrix.gcc }}
+          echo "Using GCC version:"
+          gcc-${{ matrix.gcc }} --version
+
+      # Set the selected GCC version as default
+      - name: Configure GCC-${{ matrix.gcc }}
+        run: |
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.gcc }} 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.gcc }} 100
+          export CC=/usr/bin/gcc-${{ matrix.gcc }}
+          export CXX=/usr/bin/g++-${{ matrix.gcc }}
+          echo "CC=$CC" >> $GITHUB_ENV
+          echo "CXX=$CXX" >> $GITHUB_ENV
+
+      # Install Perl with the selected GCC
+      - name: Set up Perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: ${{ matrix.perl }}
+          distribution: "default"
+          install-option: "-Dcc=${{ env.CC }}"
+
+      - run: perl -V
+      - run: perl -v
+
+      # Install Required Perl Modules
+      - name: Install Required Perl Modules
+        run: |
+          cpanm --verbose --notest Inline::C
+          cpanm --verbose Alien::OpenMP
