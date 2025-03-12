@@ -7,50 +7,6 @@ on:
       - '*'
   pull_request:
 jobs:
-  ubuntu:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        perl-version: ['5.10', '5.14', '5.20', '5.28', '5.32']
-        include:
-          - perl-version: '5.30'
-            os: ubuntu-latest
-            release-test: true
-            coverage: true
-    container: perl:${{ matrix.perl-version }}
-    steps:
-      - uses: actions/checkout@v2
-      - uses: perl-actions/install-with-cpanm@v1
-        with:
-          args: -n --installdeps --with-recommends .
-          sudo: false
-      - run: perl -V
-      - name: Build
-        run: |
-          perl Makefile.PL
-          make
-      - name: Run release tests # before others as may install useful stuff
-        if: ${{ matrix.release-test }}
-        env:
-          RELEASE_TESTING: 1
-        run: |
-          apt-get update && apt-get install -y libfile-copy-recursive-perl
-          cpanm -n --installdeps --with-develop .
-          prove -brj4 xt
-      - name: Run tests (no coverage)
-        if: ${{ !matrix.coverage }}
-        run: prove -brj4 t
-      - name: Run tests (with coverage)
-        if: ${{ matrix.coverage }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TESTING: 1
-        run: |
-          cpanm -n Devel::Cover::Report::Coveralls
-          HARNESS_PERL_SWITCHES='-MDevel::Cover=-delete,-ignore,Alien/OpenMP/Install/Files\\.pm$' prove -brj4 t xt
-          cover -report Coveralls
   non-linux:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -69,7 +25,7 @@ jobs:
       - name: Run tests
         run: |
           perl Makefile.PL
-          make
+          gmake
           prove -brj4 t
   darwin:
     runs-on: macOS-latest

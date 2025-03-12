@@ -94,7 +94,11 @@ sub _reset { $checked = 0; }
 
 sub _update_supported {
   return if $checked;
-  if ($OS eq 'darwin') {
+  # handles situation where $CCNAME is gcc as part of a path
+  if ($CCNAME =~ m/\/gcc$/) {
+    $CCNAME = 'gcc';
+  }
+  elsif ($OS eq 'darwin') {
     require File::Which;
     require Path::Tiny;
 

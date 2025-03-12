@@ -86,6 +86,16 @@ subtest 'darwin, missing dependencies' => sub {
   like $stderr, qr{Support can be enabled by using Homebrew or Macports}, 'unsupported compiler name';
 };
 
+subtest '/full/path/to/gcc' => sub {
+  local $Alien::OpenMP::configure::CCNAME = '/full/path/to/gcc';
+  local $Alien::OpenMP::configure::OS     = 'linux';
+  my $omp_flag = q{-fopenmp};
+  Alien::OpenMP::configure->_reset;
+  is +Alien::OpenMP::configure->is_known,  1, q{known};
+  is +Alien::OpenMP::configure->cflags,    $omp_flag, q{Found expected OpenMP compiler switch for gcc.};
+  is +Alien::OpenMP::configure->lddlflags, $omp_flag, q{Found expected OpenMP linker switch for gcc.};
+};
+
 subtest 'preprocessor parsing' => sub {
   my $result = Alien::OpenMP::configure->version_from_preprocessor(<<'END_OF_CPP');
 #define _LP64 1
