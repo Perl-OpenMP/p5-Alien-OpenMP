@@ -95,7 +95,7 @@ sub _reset { $checked = 0; }
 sub _update_supported {
   return if $checked;
   # handles situation where $CCNAME is gcc as part of a path
-  if ($CCNAME =~ m/\/gcc$/) {
+  if ($CCNAME =~ m{/gcc$}) {
     $CCNAME = 'gcc';
   }
   elsif ($OS eq 'darwin') {
