@@ -3,7 +3,8 @@ use strict;
 use warnings;
 use Config;
 
-our $CCNAME = $ENV{CC} || $Config::Config{ccname};
+# ExtUtils::CBuilder uses cc not ccname
+our $CCNAME = $ENV{CC} || $Config::Config{cc};
 our $OS     = $^O;
 
 my $checked   = 0;
@@ -84,8 +85,20 @@ sub version_from_preprocessor {
 
 sub _openmp_defined {
   my $define = pop;
+
   # From https://github.com/jeffhammond/HPCInfo/blob/master/docs/Preprocessor-Macros.md
-  my $versions = {200505 => '2.5', 200805 => '3.0', 201107 => '3.1', 201307 => '4.0', 201511 => '4.5', 201811 => '5.0'};
+  # also https://www.openmp.org/specifications/
+  my $versions = {
+    200505 => '2.5',
+    200805 => '3.0',
+    201107 => '3.1',
+    201307 => '4.0',
+    201511 => '4.5',
+    201811 => '5.0',
+    202011 => '5.1',
+    202111 => '5.2',
+    202411 => '6.0',
+  };
   return $versions->{$define || ''} || 'unknown';
 }
 
@@ -94,16 +107,30 @@ sub _reset { $checked = 0; }
 
 sub _update_supported {
   return if $checked;
+  require File::Basename;
+
   # handles situation where $CCNAME is gcc as part of a path
-  if ($CCNAME =~ m{/gcc$}) {
-    $CCNAME = 'gcc';
-  }
-  elsif ($OS eq 'darwin') {
+  $CCNAME = File::Basename::basename($CCNAME);
+
+  if ($OS eq 'darwin') {
     require File::Which;
     require Path::Tiny;
 
     # The issue here is that ccname=gcc and cc=cc as an interface to clang
-    $supported->{darwin} = {cflags => ['-Xclang', '-fopenmp'], libs => ['-lomp'],};
+    # First check if clang/gcc, then discern omp location
+    my $flavour = _compiler_flavour();
+    if ($flavour eq 'clang' || $flavour eq 'default') {
+      $supported->{darwin} = {cflags => ['-Xclang', '-fopenmp'], libs => ['-lomp'],};
+      $supported->{$CCNAME} ||= {auto_include => join qq{\n}, ('#include <omp.h>')};
+    }
+    elsif ($flavour eq 'gcc') {
+      $supported->{darwin} = {cflags => ['-fopenmp'], libs => ['-lomp'],};
+      $supported->{$CCNAME} ||= {auto_include => join qq{\n}, ('#include <omp.h>')};
+    }
+    else {
+      return ++$checked;
+    }
+
     if (my $mp = File::Which::which('port')) {
 
       # macports /opt/local/bin/port
@@ -112,12 +139,20 @@ sub _update_supported {
       unshift @{$supported->{darwin}{libs}}, "-L$mp_prefix/lib/libomp";
     }
     else {
-      # homebrew has the headers and library in /usr/local
-      push @{$supported->{darwin}{cflags}}, "-I/usr/local/include";
-      unshift @{$supported->{darwin}{libs}}, "-L/usr/local/lib";
+      # homebrew has the headers and library in /usr/local, but is not always symlinked
+      push @{$supported->{darwin}{cflags}}, "-I/usr/local/include", "-I/opt/homebrew/opt/libomp/include";
+      unshift @{$supported->{darwin}{libs}}, "-L/usr/local/lib", "-L/opt/homebrew/opt/libomp/lib";
     }
   }
   $checked++;
+}
+
+# not looking for openmp
+sub _compiler_flavour {
+  my $defines = qx{$CCNAME -dM -E - < /dev/null};
+  return 'clang' if ($defines =~ m{^#define __clang__}m);
+  return 'gcc'   if ($defines =~ m{^#define __GCC_}m && $defines =~ m{^#define __APPLE__}m);
+  return 'default';
 }
 
 1;
