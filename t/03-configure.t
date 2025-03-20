@@ -25,6 +25,8 @@ subtest 'gcc' => sub {
 };
 
 subtest 'darwin clang/gcc homebrew' => sub {
+  plan skip_all => 'Mocking does not work on MSWin32'
+    if $^O eq 'MSWin32';
   local $Alien::OpenMP::configure::CCNAME = 'gcc';
   local $Alien::OpenMP::configure::OS     = 'darwin';
   local $ENV{PATH}                        = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
@@ -84,6 +86,16 @@ subtest 'darwin, missing dependencies' => sub {
   like $stdout, qr{^OS Unsupported},                                      'Message for ExtUtils::MakeMaker';
   like $stderr, qr{This version of clang does not support OpenMP},        'clang missing openmp support';
   like $stderr, qr{Support can be enabled by using Homebrew or Macports}, 'unsupported compiler name';
+};
+
+subtest '/full/path/to/gcc' => sub {
+  local $Alien::OpenMP::configure::CCNAME = '/full/path/to/gcc';
+  local $Alien::OpenMP::configure::OS     = 'linux';
+  my $omp_flag = q{-fopenmp};
+  Alien::OpenMP::configure->_reset;
+  is +Alien::OpenMP::configure->is_known,  1, q{known};
+  is +Alien::OpenMP::configure->cflags,    $omp_flag, q{Found expected OpenMP compiler switch for gcc.};
+  is +Alien::OpenMP::configure->lddlflags, $omp_flag, q{Found expected OpenMP linker switch for gcc.};
 };
 
 subtest 'preprocessor parsing' => sub {

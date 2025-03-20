@@ -1,5 +1,6 @@
-{{$NEXT}}
-- doc tweaks
+0.003007  2022-05-14 20:04:34+01:00 Europe/London
+- Fixing build that breaks when CNAME is a path to
+  gcc and not just "gcc"
 
 0.003006  2021-11-01 21:46:06+01:00 Europe/London
 - Updated Inline::C integration via Alien::OpenMP::Inline
