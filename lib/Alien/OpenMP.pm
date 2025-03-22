@@ -1,5 +1,7 @@
 package Alien::OpenMP;
 
+use strict;
+use warnings;
 use parent 'Alien::Base';
 use Config ();
 use Alien::OpenMP::configure ();
