@@ -60,8 +60,8 @@ subtest 'darwin clang/gcc macports' => sub {
 };
 
 subtest 'unknown and therefore unsupported' => sub {
-  local $Alien::OpenMP::configure::CCNAME = q{unsupported xyz};
-  local $Alien::OpenMP::configure::OS     = q{foobar-os};
+  local $Alien::OpenMP::configure::CCNAME     = q{unsupported xyz};
+  local $Alien::OpenMP::configure::OS         = q{foobar-os};
   Alien::OpenMP::configure->_reset;
 
   ok !Alien::OpenMP::configure->is_known, 'not known AKA unsupported';
