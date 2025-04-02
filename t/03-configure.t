@@ -25,8 +25,8 @@ subtest 'gcc' => sub {
 };
 
 subtest 'FreeBSD clang/gcc' => sub {
-  if ($^O eq 'MSWin32') {
-    plan skip_all => 'Mocking does not work on MSWin32'
+  if ($^O ne 'freebsd') {
+    plan skip_all => 'Skipping Darwin tests on non-FreeBSD'
   }
   local $Alien::OpenMP::configure::CCNAME = 'gcc';
   local $Alien::OpenMP::configure::OS     = 'freebsd';
@@ -37,8 +37,8 @@ subtest 'FreeBSD clang/gcc' => sub {
 };
 
 subtest 'darwin clang/gcc homebrew' => sub {
-  if ($^O eq 'MSWin32') {
-    plan skip_all => 'Mocking does not work on MSWin32'
+  if ($^O ne 'darwin') {
+    plan skip_all => 'Skipping Darwin tests on non-Darwin'
   }
   local $Alien::OpenMP::configure::CCNAME = 'gcc';
   local $Alien::OpenMP::configure::OS     = 'darwin';
@@ -51,8 +51,9 @@ subtest 'darwin clang/gcc homebrew' => sub {
 };
 
 subtest 'darwin clang/gcc macports' => sub {
-  plan skip_all => 'Mocking does not work on MSWin32'
-    if $^O eq 'MSWin32';
+  if ($^O ne 'darwin') {
+    plan skip_all => 'Skipping Darwin tests on non-Darwin'
+  }
   local $Alien::OpenMP::configure::CCNAME = 'gcc';
   local $Alien::OpenMP::configure::OS     = 'darwin';
   local $ENV{PATH}                        = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
@@ -88,6 +89,9 @@ subtest 'unknown and therefore unsupported' => sub {
 };
 
 subtest 'darwin, missing dependencies' => sub {
+  if ($^O ne 'darwin') {
+    plan skip_all => 'Skipping Darwin tests on non-Darwin'
+  }
   local $Alien::OpenMP::configure::CCNAME = q{clang};
   local $Alien::OpenMP::configure::OS     = q{darwin};
   local $ENV{PATH}                        = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
