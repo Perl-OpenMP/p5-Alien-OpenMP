@@ -6,7 +6,7 @@ use parent 'Alien::Base';
 use Config ();
 use Alien::OpenMP::configure ();
 
-our $VERSION = '0.3.7';
+our $VERSION = '0.3.8';
 
 # "public" Alien::Base method implementations
 

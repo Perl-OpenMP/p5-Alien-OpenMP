@@ -1,3 +1,7 @@
+0.3.8  2025-04-02 20:04:34+01:00 Europe/London
+- Added support for FreeBSD, using FreeBSD 14
+  and clang version 16.0.6
+
 0.3.7  2022-05-14 20:04:34+01:00 Europe/London
 - Fixing build that breaks when CNAME is a path to
   gcc and not just "gcc" (or "cc")

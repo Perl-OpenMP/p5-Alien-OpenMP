@@ -144,6 +144,9 @@ sub _update_supported {
       unshift @{$supported->{darwin}{libs}}, "-L/usr/local/lib", "-L/opt/homebrew/opt/libomp/lib";
     }
   }
+  elsif ($OS eq 'freebsd') {
+    $CCNAME = 'clang';
+  }
   # covers case where "CCNAME" is "cc" but it's still "gcc"; the alternative is to add
   # 'cc' to the supported hash above, which seems to restrictive
   elsif ($CCNAME eq "cc") {

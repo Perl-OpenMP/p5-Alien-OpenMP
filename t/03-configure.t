@@ -24,9 +24,22 @@ subtest 'gcc' => sub {
   is +Alien::OpenMP::configure->lddlflags, $omp_flag, q{Found expected OpenMP linker switch for gcc.};
 };
 
+subtest 'FreeBSD clang/gcc' => sub {
+  if ($^O eq 'MSWin32') {
+    plan skip_all => 'Mocking does not work on MSWin32'
+  }
+  local $Alien::OpenMP::configure::CCNAME = 'gcc';
+  local $Alien::OpenMP::configure::OS     = 'freebsd';
+  Alien::OpenMP::configure->_reset;
+  is +Alien::OpenMP::configure->is_known, 1,                    q{known};
+  like +Alien::OpenMP::configure->cflags, qr{-Xclang -fopenmp}, q{Found expected OpenMP compiler switch for gcc/clang.};
+  like +Alien::OpenMP::configure->lddlflags, qr{-lomp},         q{Found expected OpenMP linker switch for gcc/clang.};
+};
+
 subtest 'darwin clang/gcc homebrew' => sub {
-  plan skip_all => 'Mocking does not work on MSWin32'
-    if $^O eq 'MSWin32';
+  if ($^O eq 'MSWin32') {
+    plan skip_all => 'Mocking does not work on MSWin32'
+  }
   local $Alien::OpenMP::configure::CCNAME = 'gcc';
   local $Alien::OpenMP::configure::OS     = 'darwin';
   local $ENV{PATH}                        = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
