@@ -1,0 +1,113 @@
+name: perl-coverage
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  linux-perl:
+    name: Perl ${{ matrix.perl }} / Linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep broad Linux Perl compatibility coverage.  These are prebuilt
+        # Perls from actions-setup-perl, so CI tests Alien::OpenMP itself
+        # rather than rebuilding old Perl releases under arbitrary GCCs.
+        perl:
+          - '5.12'
+          - '5.14'
+          - '5.16'
+          - '5.18'
+          - '5.20'
+          - '5.22'
+          - '5.24'
+          - '5.26'
+          - '5.28'
+          - '5.30'
+          - '5.32'
+          - '5.34'
+          - '5.36'
+          - '5.38'
+          - '5.40'
+          - '5.42'
+          - '5.44'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: ${{ matrix.perl }}
+          enable-modules-cache: false
+
+      - name: Show Perl configuration
+        shell: bash
+        run: perl -V:version -V:archname -V:cc -V:gccversion -V:make
+
+      - name: Install test dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cpanm -n \
+            Alien::Build Inline::C Test::Alien Test::Needs Capture::Tiny \
+            File::Which Path::Tiny
+
+      - name: Prepare CI Makefile.PL
+        run: cp .github/Makefile.PL.ci Makefile.PL
+
+      - name: Build and test Alien::OpenMP
+        shell: bash
+        run: |
+          set -euxo pipefail
+          perl Makefile.PL
+          make
+          make test TEST_VERBOSE=1
+
+  strawberry-perl:
+    name: Strawberry Perl ${{ matrix.perl }} / Windows
+    runs-on: windows-2025
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # Current Strawberry Perl plus a few recent stable branches.
+        # Keep this intentionally narrower than Linux historical coverage.
+        perl:
+          - '5.36'
+          - '5.38'
+          - '5.40'
+          - '5.42'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: shogo82148/actions-setup-perl@v1
+        with:
+          distribution: strawberry
+          perl-version: ${{ matrix.perl }}
+          enable-modules-cache: false
+
+      - name: Show Strawberry Perl configuration
+        shell: pwsh
+        run: |
+          perl -V:version -V:archname -V:cc -V:gccversion -V:make
+          gcc --version
+
+      - name: Install test dependencies
+        shell: pwsh
+        run: |
+          cpanm -n Alien::Build Inline::C Test::Alien Test::Needs Capture::Tiny File::Which Path::Tiny
+
+      - name: Prepare CI Makefile.PL
+        shell: pwsh
+        run: Copy-Item .github/Makefile.PL.ci Makefile.PL
+
+      - name: Build and test Alien::OpenMP
+        shell: pwsh
+        run: |
+          perl Makefile.PL
+          $make = perl -MConfig -e "print `$Config{make}"
+          & $make
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $make test TEST_VERBOSE=1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

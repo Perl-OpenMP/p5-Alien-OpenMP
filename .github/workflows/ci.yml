@@ -1,46 +1,140 @@
-name: perl
-on:
-  push:
-    branches:
-      - '*'
-    tags-ignore:
-      - '*'
-  pull_request:
+name: platform-ci
+
+on: [push, pull_request, workflow_dispatch]
+
 jobs:
-  non-linux:
-    runs-on: ${{ matrix.os }}
+  linux-native:
+    name: Linux native / ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest]
+        runner:
+          - ubuntu-22.04
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+
     steps:
-      - uses: actions/checkout@v2
-      - uses: shogo82148/actions-setup-perl@v1
-        with:
-          distribution: strawberry # ignored non-windows
-      - uses: perl-actions/install-with-cpanm@v1
-        with:
-          args: -n --installdeps --with-recommends .
-      - run: perl -V
-      - name: Run tests
+      - uses: actions/checkout@v6
+
+      - name: Show native toolchain
+        shell: bash
         run: |
-          perl Makefile.PL
-          gmake
-          prove -brj4 t
-  darwin:
-    runs-on: macOS-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Perl
-        run: brew install perl libomp
-      - name: perl -V
-        run: perl -V
-      - uses: perl-actions/install-with-cpanm@v1
-        with:
-          args: -n --installdeps --with-recommends .
-          sudo: false
-      - name: Run Tests
+          uname -a
+          perl -V:version -V:archname -V:cc -V:gccversion
+          cc --version
+
+      - name: Install test dependencies
+        shell: bash
         run: |
+          set -euxo pipefail
+          curl --fail --location --retry 3 https://cpanmin.us/ -o "$RUNNER_TEMP/cpanm"
+          perl "$RUNNER_TEMP/cpanm" -n -l "$HOME/perl5" \
+            Alien::Build Inline::C Test::Alien Test::Needs Capture::Tiny \
+            File::Which Path::Tiny
+          echo "PERL5LIB=$HOME/perl5/lib/perl5" >> "$GITHUB_ENV"
+          echo "$HOME/perl5/bin" >> "$GITHUB_PATH"
+
+      - name: Prepare CI Makefile.PL
+        run: cp .github/Makefile.PL.ci Makefile.PL
+
+      - name: Build and test
+        shell: bash
+        run: |
+          set -euxo pipefail
           perl Makefile.PL
           make
-          prove -brv t xt
+          make test TEST_VERBOSE=1
+
+  windows-strawberry:
+    name: Windows Strawberry / ${{ matrix.runner }} / Perl 5.42
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - windows-2022
+          - windows-2025
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: shogo82148/actions-setup-perl@v1
+        with:
+          distribution: strawberry
+          perl-version: '5.42'
+          enable-modules-cache: false
+
+      - name: Show Strawberry toolchain
+        shell: pwsh
+        run: |
+          perl -V:version -V:archname -V:cc -V:gccversion -V:make
+          gcc --version
+
+      - name: Install test dependencies
+        shell: pwsh
+        run: |
+          cpanm -n Alien::Build Inline::C Test::Alien Test::Needs Capture::Tiny File::Which Path::Tiny
+
+      - name: Prepare CI Makefile.PL
+        shell: pwsh
+        run: Copy-Item .github/Makefile.PL.ci Makefile.PL
+
+      - name: Build and test
+        shell: pwsh
+        run: |
+          perl Makefile.PL
+          $make = perl -MConfig -e "print `$Config{make}"
+          & $make
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $make test TEST_VERBOSE=1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  macos-apple-clang:
+    name: macOS Apple Clang / ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - macos-15
+          - macos-15-intel
+          - macos-26
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.44'
+          enable-modules-cache: false
+
+      - name: Install libomp
+        run: brew install libomp
+
+      - name: Show Apple Clang toolchain
+        shell: bash
+        run: |
+          sw_vers
+          uname -m
+          perl -V:version -V:archname -V:cc -V:ccversion
+          clang --version
+          brew --prefix libomp
+
+      - name: Install test dependencies
+        run: |
+          cpanm -n Alien::Build Inline::C Test::Alien Test::Needs Capture::Tiny File::Which Path::Tiny
+
+      - name: Prepare CI Makefile.PL
+        run: cp .github/Makefile.PL.ci Makefile.PL
+
+      - name: Build and test
+        shell: bash
+        run: |
+          set -euxo pipefail
+          perl Makefile.PL
+          make
+          make test TEST_VERBOSE=1

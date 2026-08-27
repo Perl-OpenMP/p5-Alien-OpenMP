@@ -6,17 +6,10 @@ use parent 'Alien::Base';
 use Config ();
 use Alien::OpenMP::configure ();
 
-our $VERSION = '0.3.8';
+our $VERSION = '0.3.9';
 
-# "public" Alien::Base method implementations
-
-# we can reuse cflags for gcc/gomp; hopefully this will
-# remain the case for all supported compilers
 sub lddlflags { shift->libs }
-
 sub openmp_version { shift->runtime_prop->{openmp_version} }
-
-# Inline related methods
 
 sub Inline {
   my ($self, $lang) = @_;
@@ -24,8 +17,8 @@ sub Inline {
   $params->{CCFLAGSEX} = delete $params->{INC};
   return {
     %$params,
-    LDDLFLAGS     => join( q{ }, $Config::Config{lddlflags}, $self->lddlflags() ),
-    AUTO_INCLUDE  => $self->runtime_prop->{auto_include},
+    LDDLFLAGS    => join(q{ }, $Config::Config{lddlflags}, $self->lddlflags()),
+    AUTO_INCLUDE => $self->runtime_prop->{auto_include},
   };
 }
 
@@ -40,131 +33,69 @@ Alien::OpenMP - Encapsulate system info for OpenMP
 =head1 SYNOPSIS
 
     use Alien::OpenMP;
-    say Alien::OpenMP->cflags;       # e.g. '-fopenmp' if gcc
-    say Alien::OpenMP->lddlflags;    # e.g. '-fopenmp' if gcc
-    say Alien::OpenMP->auto_include; # e.g. '#include <omp.h>' if gcc
+    say Alien::OpenMP->cflags;
+    say Alien::OpenMP->lddlflags;
+    say Alien::OpenMP->auto_include;
 
 =head1 DESCRIPTION
 
-This module encapsulates the knowledge required to compile OpenMP programs
-C<$Config{ccname}>. C<C>, C<Fortran>, and C<C++> programs annotated
-with declarative OpenMP pragmas will still compile if the compiler (and
-linker if this is a separate process) is not passed the appropriate flag
-to enable OpenMP support. This is because all pragmas are hidden behind
-full line comments (with the addition of OpenMP specific C<sentinels>,
-as they are called).
+Alien::OpenMP provides the compiler and linker flags needed to enable OpenMP
+for the C compiler configured into the running Perl.
 
-All compilers require OpenMP to be explicitly activated during compilation;
-for example, GCC's implementation, C<GOMP>, is invoked by the C<-fopenmp>
-flag.
-
-Most major compilers support OpenMP, including: GCC, Intel, IBM,
-Portland Group, NAG, and those compilers created using LLVM. GCC's OpenMP
-implementation, C<GOMP>, is available in all modern versions. Unfortunately,
-while OpenMP is a well supported standard; compilers are not required to
-use the same commandline switch to activate support. All compilers that
-support OpenMP use slightly different ways of invoking it.
+The module intentionally follows Perl's C<$Config{cc}> toolchain.  Perl XS and
+Inline::C builds normally inherit that compiler and its ABI/linker settings, so
+an unrelated C<ENV{CC}> is not treated as an implicit request to switch
+compilers.  ABI-compatible alternate compilers may be usable by applications,
+but they are outside the default Alien::OpenMP toolchain contract.
 
 =head2 Compilers Supported by this module
-
-At this time, the following compilers are supported:
 
 =over 4
 
 =item C<gcc>
 
-C<-fopenmp> enables OpenMP support in via compiler and linker:
-
-    gcc -fopenmp ./my-openmp.c -o my-openmp.x
+GCC uses C<-fopenmp> for compilation and runtime linkage.  Compiler family is
+detected from predefined macros rather than the executable filename, so names
+such as C<gcc-16> and target-prefixed GCC drivers are supported.
 
 =item C<clang> EXPERIMENTAL
 
-C<-fopenmp> enables OpenMP support via compiler and linker in recent
-versions of C<clang>. MacOS shipped versions are missing the library
-which needs installing either with L<Homebrew|https://brew.sh> or
-L<Macports|https://www.macports.org>.
+Upstream LLVM Clang uses C<-fopenmp>.  Apple Clang on macOS requires an
+external OpenMP runtime (normally C<libomp> from Homebrew or MacPorts), for
+which Alien::OpenMP adds the required include/library paths.
 
 =back
 
 =head2 Note On Compiler Support
 
-If used for an unsupported compiler, C<ExtUtils::MakeMaker::os_unsupported>
-is invoked, which results an exception propagating from this method being
-raised with the value of C<qq{OS unsupported\n}> (note the new line).
-
-This module assumes that the compiler in question is the same one used to
-build C<perl>. Since the vast majority of C<perl>s are building using
-C<gcc>, initial support is targeting it. However, like C<perl>, many
-other compilers may be used.
-
-Adding support for a new compiler should be straightforward; please
-section on contributing, below.
-
-=head2 Contributing
-
-The biggest need is to support additional compilers. OpenMP is a well
-established standard across compilers, but there is no guarantee that
-all compilers will use the same flags, library names, or header files. It
-should also be easy to contribute a patch to add this information, which
-is effectively its purpose. At the very least, please create an issue
-at the official issue tracker to request this support, and be sure to
-include the relevant information. Chances are the maintainers of this
-module do not have access to an unsupported compiler.
+The compiler configured into the running Perl is the authoritative toolchain.
+A compile/link probe verifies that the selected flags, C<omp.h>, and OpenMP
+runtime actually work before installation succeeds.
 
 =head1 METHODS
 
-=over 3
+=head2 cflags
 
-=item C<cflags>
+Return compiler flags used to enable OpenMP.
 
-Returns flag used by a supported compiler to enable OpenMP. If not support,
-an empty string is provided since by definition all OpenMP programs
-must compile because OpenMP pragmas are annotations hidden behind source
-code comments.
+=head2 lddlflags
 
-Example, GCC uses, C<-fopenmp>.
+Return linker flags used to enable/link OpenMP.
 
-=item C<lddlflags>
+=head2 openmp_version
 
-Returns the flag used by the linker to enable OpenMP. This is usually
-the same as what is returned by C<cflags>.
+Return the dated value advertised by the compiler's C<_OPENMP> macro.
 
-Example, GCC uses, C<-fopenmp>, for this as well.
+=head2 version
 
-=item C<openmp_version>
+Return the corresponding OpenMP specification version.  This is the
+specification date advertised by the compiler, not a guarantee that every
+feature of that specification is implemented.
 
-Returns the version of OpenMP provided by the compiler. The value returned
-is the value of the C<#define _OPENMP>.
+=head2 Inline
 
-For a decimal version consider using L</"version">.
-
-=item C<version>
-
-Return the version of OpenMP provided by the compiler in decimal form. The
-table used is derived from
-L<https://github.com/jeffhammond/HPCInfo/blob/master/docs/Preprocessor-Macros.md>.
-
-=item C<Inline>
-
-Used in support of L<Inline::C>'s C<with> method (inherited from
-L<Inline>). This method is not called directly, but used when compiling
-OpenMP programs with C<Inline::C>:
-
-    use Alien::OpenMP; use Inline C => 'DATA', with => q/Alien::OpenMP/;
-
-The nice, compact form above replaces this mess:
-
-    use Alien::OpenMP; use Inline (
-        C             => 'DATA',
-        ccflagsex     => Alien::OpenMP->cflags(),
-        lddlflags     => join( q{ }, $Config::Config{lddlflags}, Alien::OpenMP::lddlflags() ),
-        auto_include => Alien::OpenMP->auto_include(),
-    );
-
-It also means that the standard I<include> for OpenMP is not required in
-the C<C> code, i.e., C<< #include <omp.h> >>.
-
-=back
+Support Inline::C's C<with =E<gt> 'Alien::OpenMP'> integration, including
+OpenMP compiler/linker flags and C<#include E<lt>omp.hE<gt>>.
 
 =head1 AUTHOR
 
@@ -174,11 +105,11 @@ OODLER 577 <oodler@cpan.org>
 
 Copyright (C) 2021 by oodler577
 
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.30.0 or,
-at your option, any later version of Perl 5 you may have available.
+This library is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
 
 =head1 SEE ALSO
 
-L<PDL>, L<OpenMP::Environment>,
-L<https://gcc.gnu.org/onlinedocs/libgomp/index.html>.
+L<PDL>, L<OpenMP::Environment>, L<https://gcc.gnu.org/onlinedocs/libgomp/index.html>.
+
+=cut

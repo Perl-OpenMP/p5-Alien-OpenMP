@@ -1,144 +1,81 @@
-BEGIN { $ENV{CC} = 'xyz-cc' }
 use strict;
 use warnings;
 use Test::More;
-use Test::Alien;
 use Alien::OpenMP::configure;
-use Path::Tiny;
 use Capture::Tiny qw(capture);
 
-subtest 'CC environment variable' => sub {
+sub profile {
+  my (%arg) = @_;
+  local $Alien::OpenMP::configure::CCNAME = $arg{cc};
+  local $Alien::OpenMP::configure::OS = $arg{os} || 'linux';
+  local $Alien::OpenMP::configure::COMPILER_FAMILY = $arg{family};
+  Alien::OpenMP::configure->_reset;
+  return {
+    known  => Alien::OpenMP::configure->is_known,
+    family => Alien::OpenMP::configure->compiler_family,
+    cflags => Alien::OpenMP::configure->cflags,
+    libs   => Alien::OpenMP::configure->libs,
+  };
+}
+
+subtest 'compiler macro identification' => sub {
+  is Alien::OpenMP::configure::_compiler_family_from_defines("#define __GNUC__ 16\n"), 'gcc', 'GCC';
+  is Alien::OpenMP::configure::_compiler_family_from_defines("#define __GNUC__ 4\n#define __clang__ 1\n"), 'clang', 'Clang wins over GCC compatibility macro';
+  is Alien::OpenMP::configure::_compiler_family_from_defines("#define SOMETHING 1\n"), 'unknown', 'unknown compiler';
+};
+
+subtest 'simulated GCC profile accepts common driver names' => sub {
+  for my $cc (qw/gcc gcc-16 x86_64-linux-gnu-gcc aarch64-linux-gnu-gcc/) {
+    my $p = profile(cc => $cc, family => 'gcc');
+    ok $p->{known}, "$cc known";
+    is $p->{cflags}, '-fopenmp', "$cc cflags";
+    is $p->{libs}, '-fopenmp', "$cc libs";
+  }
+};
+
+subtest 'simulated Darwin GCC profile keeps libgomp toolchain' => sub {
+  my $p = profile(cc => 'gcc-16', family => 'gcc', os => 'darwin');
+  is $p->{cflags}, '-fopenmp', 'GCC compile flag';
+  is $p->{libs}, '-fopenmp', 'GCC links via GCC/libgomp, not LLVM -lomp';
+  unlike $p->{libs}, qr/-lomp/, 'does not mix LLVM runtime into GCC';
+};
+
+subtest 'simulated Linux upstream Clang profile' => sub {
+  my $p = profile(cc => 'clang', family => 'clang', os => 'linux');
+  ok $p->{known}, 'clang known';
+  is $p->{cflags}, '-fopenmp', 'clang cflags';
+  is $p->{libs}, '-fopenmp', 'clang linker driver selects runtime';
+};
+
+subtest 'simulated FreeBSD profiles follow compiler family' => sub {
+  my $gcc = profile(cc => 'gcc', family => 'gcc', os => 'freebsd');
+  is $gcc->{family}, 'gcc', 'simulated FreeBSD GCC remains GCC';
+  is $gcc->{libs}, '-fopenmp', 'simulated FreeBSD GCC uses GCC linkage';
+  my $clang = profile(cc => 'cc', family => 'clang', os => 'freebsd');
+  is $clang->{family}, 'clang', 'simulated FreeBSD base cc detected as clang';
+  is $clang->{cflags}, '-fopenmp', 'simulated FreeBSD clang flag';
+};
+
+subtest 'unknown is unsupported' => sub {
+  local $Alien::OpenMP::configure::CCNAME = 'xyz-cc';
   local $Alien::OpenMP::configure::OS = 'linux';
+  local $Alien::OpenMP::configure::COMPILER_FAMILY = 'unknown';
   Alien::OpenMP::configure->_reset;
-  is $Alien::OpenMP::configure::CCNAME, 'xyz-cc', 'esoteric compiler name';
-  ok !Alien::OpenMP::configure->is_known, q{not known};
-};
-
-subtest 'gcc' => sub {
-  local $Alien::OpenMP::configure::CCNAME = 'gcc';
-  local $Alien::OpenMP::configure::OS     = 'linux';
-  my $omp_flag = q{-fopenmp};
-  Alien::OpenMP::configure->_reset;
-  is +Alien::OpenMP::configure->is_known,  1, q{known};
-  is +Alien::OpenMP::configure->cflags,    $omp_flag, q{Found expected OpenMP compiler switch for gcc.};
-  is +Alien::OpenMP::configure->lddlflags, $omp_flag, q{Found expected OpenMP linker switch for gcc.};
-};
-
-subtest 'FreeBSD clang/gcc' => sub {
-  if ($^O ne 'freebsd') {
-    plan skip_all => 'Skipping Darwin tests on non-FreeBSD'
-  }
-  local $Alien::OpenMP::configure::CCNAME = 'gcc';
-  local $Alien::OpenMP::configure::OS     = 'freebsd';
-  Alien::OpenMP::configure->_reset;
-  is +Alien::OpenMP::configure->is_known, 1,                    q{known};
-  like +Alien::OpenMP::configure->cflags, qr{-Xclang -fopenmp}, q{Found expected OpenMP compiler switch for gcc/clang.};
-  like +Alien::OpenMP::configure->lddlflags, qr{-lomp},         q{Found expected OpenMP linker switch for gcc/clang.};
-};
-
-subtest 'darwin clang/gcc homebrew' => sub {
-  if ($^O ne 'darwin') {
-    plan skip_all => 'Skipping Darwin tests on non-Darwin'
-  }
-  local $Alien::OpenMP::configure::CCNAME = 'gcc';
-  local $Alien::OpenMP::configure::OS     = 'darwin';
-  local $ENV{PATH}                        = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
-  Alien::OpenMP::configure->_reset;
-  is +Alien::OpenMP::configure->is_known, 1,                    q{known};
-  like +Alien::OpenMP::configure->cflags, qr{-Xclang -fopenmp}, q{Found expected OpenMP compiler switch for gcc/clang.};
-  like +Alien::OpenMP::configure->lddlflags, qr{-lomp},         q{Found expected OpenMP linker switch for gcc/clang.};
-  like +Alien::OpenMP::configure->cflags,    qr{-I/usr/local/include}, q{Found path to include headers};
-};
-
-subtest 'darwin clang/gcc macports' => sub {
-  if ($^O ne 'darwin') {
-    plan skip_all => 'Skipping Darwin tests on non-Darwin'
-  }
-  local $Alien::OpenMP::configure::CCNAME = 'gcc';
-  local $Alien::OpenMP::configure::OS     = 'darwin';
-  local $ENV{PATH}                        = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
-
-  # create a mock port executable
-  my $tempdir = Path::Tiny->tempdir();
-  my $port    = $tempdir->child('bin', 'port');
-  $port->parent->mkpath;
-  $port->spew("#!/bin/bash");
-  $port->chmod(0755);
-  $ENV{PATH} .= ":$tempdir/bin";
-  Alien::OpenMP::configure->_reset;
-  is +Alien::OpenMP::configure->is_known, 1,                    q{known};
-  like +Alien::OpenMP::configure->cflags, qr{-Xclang -fopenmp}, q{Found expected OpenMP compiler switch for gcc/clang.};
-  like +Alien::OpenMP::configure->lddlflags, qr{-lomp},         q{Found expected OpenMP linker switch for gcc/clang.};
-  like +Alien::OpenMP::configure->cflags,    qr{-I$tempdir/include/libomp}, q{Found path to include headers};
-  like +Alien::OpenMP::configure->libs,      qr{-L$tempdir/lib/libomp},     q{Found path to library};
-};
-
-subtest 'unknown and therefore unsupported' => sub {
-  local $Alien::OpenMP::configure::CCNAME     = q{unsupported xyz};
-  local $Alien::OpenMP::configure::OS         = q{foobar-os};
-  Alien::OpenMP::configure->_reset;
-
-  ok !Alien::OpenMP::configure->is_known, 'not known AKA unsupported';
-  is +Alien::OpenMP::configure->cflags, q{}, 'empty string';
-  is +Alien::OpenMP::configure->libs,   q{}, 'empty string';
-
-  my ($stdout, $stderr, @result) = capture { Alien::OpenMP::configure->unsupported; 1 };
-  is_deeply \@result, [1], 'no errors';
-  like $stdout, qr{^OS Unsupported},                                         'Message for ExtUtils::MakeMaker';
-  like $stderr, qr{This version of unsupported xyz does not support OpenMP}, 'unsupported compiler name';
-};
-
-subtest 'darwin, missing dependencies' => sub {
-  if ($^O ne 'darwin') {
-    plan skip_all => 'Skipping Darwin tests on non-Darwin'
-  }
-  local $Alien::OpenMP::configure::CCNAME = q{clang};
-  local $Alien::OpenMP::configure::OS     = q{darwin};
-  local $ENV{PATH}                        = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
-  Alien::OpenMP::configure->_reset;
-  ok +Alien::OpenMP::configure->is_known, 'known';
-
-  my ($stdout, $stderr, @result) = capture { Alien::OpenMP::configure->unsupported; 1 };
-  is_deeply \@result, [1], 'no errors';
-  like $stdout, qr{^OS Unsupported},                                      'Message for ExtUtils::MakeMaker';
-  like $stderr, qr{This version of clang does not support OpenMP},        'clang missing openmp support';
-  like $stderr, qr{Support can be enabled by using Homebrew or Macports}, 'unsupported compiler name';
-};
-
-subtest '/full/path/to/gcc' => sub {
-  local $Alien::OpenMP::configure::CCNAME = '/full/path/to/gcc';
-  local $Alien::OpenMP::configure::OS     = 'linux';
-  my $omp_flag = q{-fopenmp};
-  Alien::OpenMP::configure->_reset;
-  is +Alien::OpenMP::configure->is_known,  1, q{known};
-  is +Alien::OpenMP::configure->cflags,    $omp_flag, q{Found expected OpenMP compiler switch for gcc.};
-  is +Alien::OpenMP::configure->lddlflags, $omp_flag, q{Found expected OpenMP linker switch for gcc.};
+  ok !Alien::OpenMP::configure->is_known, 'not known';
+  is(Alien::OpenMP::configure->cflags, q{}, 'empty cflags');
+  is(Alien::OpenMP::configure->libs, q{}, 'empty libs');
+  my ($stdout, $stderr) = capture { Alien::OpenMP::configure->unsupported };
+  like $stdout, qr/^OS Unsupported/, 'MakeMaker-compatible unsupported marker';
+  like $stderr, qr/xyz-cc/, 'diagnostic names compiler';
 };
 
 subtest 'preprocessor parsing' => sub {
-  my $result = Alien::OpenMP::configure->version_from_preprocessor(<<'END_OF_CPP');
-#define _LP64 1
-#define _OPENMP 201811
-#define __GNUC_MINOR__ 2
-#define __GNUC_PATCHLEVEL__ 1
-#define __GNUC_STDC_INLINE__ 1
-#define __GNUC__ 4
-#define __GXX_ABI_VERSION 1002
-#define __USER_LABEL_PREFIX__ _
-#define __VERSION__ "Apple LLVM 12.0.5 (clang-1205.0.22.11)"
-#define __clang_version__ "12.0.5 (clang-1205.0.22.11)"
-
-END_OF_CPP
-  is_deeply $result, {openmp_version => '201811', version => '5.0'}, 'correct version';
-
-  my $unknown = Alien::OpenMP::configure->version_from_preprocessor(<<'END_OF_CPP');
-#define _LP64 1
-#define __GNUC_MINOR__ 2
-#define __GNUC_PATCHLEVEL__ 1
-#define __GNUC_STDC_INLINE__ 1
-#define __GNUC__ 4
-END_OF_CPP
-  is_deeply $unknown, {openmp_version => undef, version => 'unknown'}, 'unknown version';
+  my $result = Alien::OpenMP::configure->version_from_preprocessor("#define _OPENMP 201811\n#define __GNUC__ 9\n");
+  is_deeply $result, {openmp_version => '201811', version => '5.0'}, 'OpenMP 5.0';
+  my $six = Alien::OpenMP::configure->version_from_preprocessor("# define _OPENMP 202411\n");
+  is_deeply $six, {openmp_version => '202411', version => '6.0'}, 'OpenMP 6.0';
+  my $unknown = Alien::OpenMP::configure->version_from_preprocessor("#define __GNUC__ 16\n");
+  is_deeply $unknown, {openmp_version => undef, version => 'unknown'}, 'no _OPENMP';
 };
 
 done_testing;

@@ -1,75 +1,225 @@
-name: Perl CI with Inline::C and OpenMP
+name: compiler-coverage
 
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
+  linux-gcc:
+    name: ${{ matrix.cc }} / ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
     strategy:
-      fail-fast: false  # Ensure all jobs run even if one fails
+      fail-fast: false
       matrix:
-        os: ["ubuntu-latest"]
-        perl: ["5.40.1", "5.38.3", "5.36.3", "5.34.3", "5.32.1", "5.30.3", "5.28.3", "5.26.3", "5.24.4", "5.22.3", "5.20.0", "5.18.4", "5.16.3", "5.14.4", "5.12.5"]
-        gcc: ["13", "11", "9"]  # Different GCC versions to test
-
-    name: Perl ${{ matrix.perl }} with GCC-${{ matrix.gcc }} on ${{ matrix.os }}
+        include:
+          # GCC versions shipped on GitHub's GA Ubuntu images.
+          - runner: ubuntu-22.04
+            cc: gcc-10
+          - runner: ubuntu-22.04
+            cc: gcc-11
+          - runner: ubuntu-22.04
+            cc: gcc-12
+          - runner: ubuntu-24.04
+            cc: gcc-12
+          - runner: ubuntu-24.04
+            cc: gcc-13
+          - runner: ubuntu-24.04
+            cc: gcc-14
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      # Install the requested GCC version and dependencies
-      - name: Install GCC-${{ matrix.gcc }} and Dependencies
+      - name: Show compiler
+        shell: bash
+        run: ${{ matrix.cc }} --version
+
+      - name: Verify Alien::OpenMP compiler detection and flags
+        shell: bash
+        env:
+          CC_UNDER_TEST: ${{ matrix.cc }}
         run: |
-          sudo apt update
-          sudo apt install -y gcc-${{ matrix.gcc }} g++-${{ matrix.gcc }} build-essential libgomp1 curl
+          set -euxo pipefail
 
-      # Switch GCC at the OS level using update-alternatives
-      - name: Set GCC-${{ matrix.gcc }} as Default
+          family="$(
+            perl -Ilib -MAlien::OpenMP::configure -e '
+              my ($cc) = @ARGV;
+              local $Alien::OpenMP::configure::CCNAME = $cc;
+              local $Alien::OpenMP::configure::COMPILER_FAMILY;
+              Alien::OpenMP::configure->_reset;
+              print Alien::OpenMP::configure->compiler_family;
+            ' "$CC_UNDER_TEST"
+          )"
+          test "$family" = gcc
+
+          cflags="$(
+            perl -Ilib -MAlien::OpenMP::configure -e '
+              my ($cc) = @ARGV;
+              local $Alien::OpenMP::configure::CCNAME = $cc;
+              local $Alien::OpenMP::configure::COMPILER_FAMILY;
+              Alien::OpenMP::configure->_reset;
+              print Alien::OpenMP::configure->cflags;
+            ' "$CC_UNDER_TEST"
+          )"
+          libs="$(
+            perl -Ilib -MAlien::OpenMP::configure -e '
+              my ($cc) = @ARGV;
+              local $Alien::OpenMP::configure::CCNAME = $cc;
+              local $Alien::OpenMP::configure::COMPILER_FAMILY;
+              Alien::OpenMP::configure->_reset;
+              print Alien::OpenMP::configure->libs;
+            ' "$CC_UNDER_TEST"
+          )"
+
+          test "$cflags" = '-fopenmp'
+          test "$libs" = '-fopenmp'
+
+          cat > "$RUNNER_TEMP/openmp-probe.c" <<'EOF'
+          #include <omp.h>
+          #include <stdio.h>
+          int main(void) {
+          #ifndef _OPENMP
+            return 2;
+          #else
+            printf("_OPENMP=%d max_threads=%d\n", _OPENMP, omp_get_max_threads());
+            return omp_get_max_threads() < 1;
+          #endif
+          }
+          EOF
+
+          "$CC_UNDER_TEST" $cflags "$RUNNER_TEMP/openmp-probe.c" $libs -o "$RUNNER_TEMP/openmp-probe"
+          OMP_NUM_THREADS=2 "$RUNNER_TEMP/openmp-probe"
+
+  macos-gcc:
+    name: ${{ matrix.cc }} / macOS
+    runs-on: macos-15
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # GNU GCC versions already installed on the GitHub macOS image.
+        cc:
+          - gcc-13
+          - gcc-14
+          - gcc-15
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Show compiler
+        run: ${{ matrix.cc }} --version
+
+      - name: Verify GNU GCC is not mixed with LLVM libomp
+        shell: bash
+        env:
+          CC_UNDER_TEST: ${{ matrix.cc }}
         run: |
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.gcc }} 100
-          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.gcc }} 100
-          sudo update-alternatives --set gcc /usr/bin/gcc-${{ matrix.gcc }}
-          sudo update-alternatives --set g++ /usr/bin/g++-${{ matrix.gcc }}
-          
-          export CC=/usr/bin/gcc
-          export CXX=/usr/bin/g++
-          echo "CC=$CC" >> $GITHUB_ENV
-          echo "CXX=$CXX" >> $GITHUB_ENV
+          set -euxo pipefail
 
-          echo "Using system GCC version:"
-          gcc --version
+          family="$(
+            perl -Ilib -MAlien::OpenMP::configure -e '
+              my ($cc) = @ARGV;
+              local $Alien::OpenMP::configure::CCNAME = $cc;
+              local $Alien::OpenMP::configure::COMPILER_FAMILY;
+              Alien::OpenMP::configure->_reset;
+              print Alien::OpenMP::configure->compiler_family;
+            ' "$CC_UNDER_TEST"
+          )"
+          cflags="$(
+            perl -Ilib -MAlien::OpenMP::configure -e '
+              my ($cc) = @ARGV;
+              local $Alien::OpenMP::configure::CCNAME = $cc;
+              local $Alien::OpenMP::configure::COMPILER_FAMILY;
+              Alien::OpenMP::configure->_reset;
+              print Alien::OpenMP::configure->cflags;
+            ' "$CC_UNDER_TEST"
+          )"
+          libs="$(
+            perl -Ilib -MAlien::OpenMP::configure -e '
+              my ($cc) = @ARGV;
+              local $Alien::OpenMP::configure::CCNAME = $cc;
+              local $Alien::OpenMP::configure::COMPILER_FAMILY;
+              Alien::OpenMP::configure->_reset;
+              print Alien::OpenMP::configure->libs;
+            ' "$CC_UNDER_TEST"
+          )"
 
-      # Install Perlbrew
-      - name: Install Perlbrew
+          test "$family" = gcc
+          test "$cflags" = '-fopenmp'
+          test "$libs" = '-fopenmp'
+          case "$libs" in
+            *-lomp*) exit 1 ;;
+          esac
+
+          cat > "$RUNNER_TEMP/openmp-probe.c" <<'EOF'
+          #include <omp.h>
+          #include <stdio.h>
+          int main(void) {
+            printf("_OPENMP=%d max_threads=%d\n", _OPENMP, omp_get_max_threads());
+            return omp_get_max_threads() < 1;
+          }
+          EOF
+
+          "$CC_UNDER_TEST" -fopenmp "$RUNNER_TEMP/openmp-probe.c" -fopenmp -o "$RUNNER_TEMP/openmp-probe"
+          OMP_NUM_THREADS=2 "$RUNNER_TEMP/openmp-probe"
+
+  linux-clang:
+    name: ${{ matrix.cc }} detection / ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Clang versions shipped on GitHub's GA Ubuntu images.
+          - runner: ubuntu-22.04
+            cc: clang-13
+          - runner: ubuntu-22.04
+            cc: clang-14
+          - runner: ubuntu-22.04
+            cc: clang-15
+          - runner: ubuntu-24.04
+            cc: clang-16
+          - runner: ubuntu-24.04
+            cc: clang-17
+          - runner: ubuntu-24.04
+            cc: clang-18
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Show compiler
+        run: ${{ matrix.cc }} --version
+
+      - name: Verify Clang detection and OpenMP compile flag
+        shell: bash
+        env:
+          CC_UNDER_TEST: ${{ matrix.cc }}
         run: |
-          curl -L https://install.perlbrew.pl | bash
-          echo 'export PERLBREW_ROOT=$HOME/perl5/perlbrew' >> $HOME/.bashrc
-          echo 'source $HOME/perl5/perlbrew/etc/bashrc' >> $HOME/.bashrc
-          export PERLBREW_ROOT=$HOME/perl5/perlbrew
-          export PATH="$PERLBREW_ROOT/bin:$PATH"
-          source $HOME/perl5/perlbrew/etc/bashrc
-          perlbrew available
+          set -euxo pipefail
 
-      # Install and Use the Requested Perl Version
-      - name: Install Perl ${{ matrix.perl }} with GCC-${{ matrix.gcc }}
-        run: |
-          export PERLBREW_ROOT=$HOME/perl5/perlbrew
-          export PATH="$PERLBREW_ROOT/bin:$PATH"
-          source $HOME/perl5/perlbrew/etc/bashrc
+          family="$(
+            perl -Ilib -MAlien::OpenMP::configure -e '
+              my ($cc) = @ARGV;
+              local $Alien::OpenMP::configure::CCNAME = $cc;
+              local $Alien::OpenMP::configure::COMPILER_FAMILY;
+              Alien::OpenMP::configure->_reset;
+              print Alien::OpenMP::configure->compiler_family;
+            ' "$CC_UNDER_TEST"
+          )"
+          cflags="$(
+            perl -Ilib -MAlien::OpenMP::configure -e '
+              my ($cc) = @ARGV;
+              local $Alien::OpenMP::configure::CCNAME = $cc;
+              local $Alien::OpenMP::configure::COMPILER_FAMILY;
+              Alien::OpenMP::configure->_reset;
+              print Alien::OpenMP::configure->cflags;
+            ' "$CC_UNDER_TEST"
+          )"
 
-          perlbrew --verbose --notest install perl-${{ matrix.perl }} -Dcc=$CC
-          perlbrew use perl-${{ matrix.perl }}
-          perlbrew install-cpanm
+          test "$family" = clang
+          test "$cflags" = '-fopenmp'
 
-          perl -V
-          perl -v
-
-      # Install Required Perl Modules
-      - name: Install Required Perl Modules
-        run: |
-          export PERLBREW_ROOT=$HOME/perl5/perlbrew
-          export PATH="$PERLBREW_ROOT/bin:$PATH"
-          source $HOME/perl5/perlbrew/etc/bashrc
-          perlbrew use perl-${{ matrix.perl }}
-          cpanm --verbose --notest Inline::C
-          cpanm --verbose . 
+          # This checks the GitHub-provided compiler itself accepts OpenMP and
+          # advertises _OPENMP.  Runtime/header availability is covered by the
+          # platform integration tests where a matching libomp is present.
+          printf '\n' | "$CC_UNDER_TEST" -fopenmp -dM -E - \
+            | grep -qE '^[[:space:]]*#define[[:space:]]+_OPENMP[[:space:]]+[0-9]+'

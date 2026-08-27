@@ -1,3 +1,29 @@
+0.3.9  2026-08-27
+- Harden compiler selection by using the compiler configured into the running
+  Perl rather than allowing ENV{CC} to silently select a different toolchain
+- Detect GCC and Clang from predefined compiler macros instead of executable
+  names, covering versioned and target-prefixed GCC driver names
+- Keep GNU GCC on macOS on the GCC/libgomp -fopenmp toolchain instead of
+  mixing it with LLVM -lomp
+- Stop forcing every FreeBSD compiler to Clang; use the compiler actually
+  configured into Perl
+- Use upstream Clang's -fopenmp profile outside macOS and retain Apple Clang
+  libomp handling on macOS
+- Prefer `brew --prefix libomp` for macOS libomp discovery, with MacPorts and
+  conventional Homebrew paths as fallbacks
+- Make the install capability probe independent of a requested OpenMP thread
+  count so runtime/site policy does not cause false negatives
+- Reduce high-thread-count Inline::C regression tests to portable 1/2/4-thread
+  checks
+- Expand regression tests for compiler-family detection, GCC driver naming,
+  Darwin GCC runtime selection, FreeBSD GCC/Clang selection, and OpenMP macro
+  parsing
+- Replace stale CI with explicit Linux GCC, Linux Clang, Strawberry Windows,
+  Apple Clang/macOS, and FreeBSD coverage
+- Add a GCC 10 through GCC 16 compiler sweep using Perls built by each GCC
+- Bootstrap Dist::Zilla in CI before testing the author source tree; Makefile.PL
+  is generated and is not stored in the repository
+
 0.3.8  2025-04-02 20:04:34+01:00 Europe/London
 - Added support for FreeBSD, using FreeBSD 14
   and clang version 16.0.6
@@ -6,42 +32,5 @@
 - Fixing build that breaks when CNAME is a path to
   gcc and not just "gcc" (or "cc")
 - Fix breaking Darwin tests
-- updated versioning to be semantic style 
+- updated versioning to be semantic style
 - updated dist.ini
-
-0.003006  2021-11-01 21:46:06+01:00 Europe/London
-- Updated Inline::C integration via Alien::OpenMP::Inline
-  to provide 'auto_include', which provides the
-  line, #include <omp.h>, saving the programmer the
-  need to worry about it. It's compiler specific,
-  but both supported compilers (gcc, clang) use the
-  same one (omp.h).
-
-0.003005  2021-10-31 21:46:06+01:00 Europe/London
-- Got a nice dist.ini and test update; no functional
-  changes but dist.ini is now proper - thanks, @Grinnz!
-
-0.003004  2021-10-30 21:46:06+01:00 Europe/London
-- Replaced static Makefile.PL with one generated
-  using [AlienBuild] and [MakeMaker::Awesome].
-
-0.003003  2021-10-10 21:46:06+01:00 Europe/London
-- support clang, use Alien::Build - thanks @kiwiroy
-
-0.003002 2021-05-20
-- fixed Makefile.PL (again)..
-  made sure Devel::CheckLib is added
-  to META.json by dzil
-
-0.003001 2021-05-12
-- fixed Makefile.PL
-
-0.003 2021-05-08
-- added Inline method for use with Inline::*
-  See POD for more info it's use.
-
-0.002 2021-04-20
-- support GCC on Linux
-
-0.001 2021-04-17
-- basic no-op

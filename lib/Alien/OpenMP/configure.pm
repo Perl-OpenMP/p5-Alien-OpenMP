@@ -3,62 +3,57 @@ use strict;
 use warnings;
 use Config;
 
-# ExtUtils::CBuilder uses cc not ccname
-our $CCNAME = $ENV{CC} || $Config::Config{cc};
+# Alien::OpenMP describes the extension toolchain of the running Perl.
+# Do not silently let ENV{CC} select a compiler different from Config{cc};
+# downstream XS/Inline tooling normally returns to Perl's configured compiler.
+our $CCNAME = $Config::Config{cc};
 our $OS     = $^O;
 
-my $checked   = 0;
-my $supported = {
-    gcc => {
-        cflags        => ['-fopenmp'],
-        libs          => ['-fopenmp'],
-        auto_include  => join qq{\n}, ('#include <omp.h>'),
-    },
-    clang => {
-        cflags        => [ '-Xclang', '-fopenmp' ],
-        libs          => ['-lomp'],                 # this could be -Xpreprocessor
-        auto_include  => join qq{\n}, ('#include <omp.h>'),
-    },
-};
+# Test hook.  Production code leaves this undefined and detects the compiler
+# from its predefined macros.
+our $COMPILER_FAMILY;
+
+my $checked = 0;
+my $profile;
 
 sub auto_include {
   shift->_update_supported;
-  return $supported->{$CCNAME}{auto_include} || q{};
+  return $profile->{auto_include} || q{};
 }
 
 sub cflags {
   shift->_update_supported;
-  return join ' ', @{$supported->{$OS}{cflags} || $supported->{$CCNAME}{cflags} || []};
+  return join ' ', @{$profile->{cflags} || []};
 }
 
 sub is_known {
   shift->_update_supported;
-  return !!(exists($supported->{$OS}) || exists($supported->{$CCNAME}));
+  return !!$profile->{known};
 }
 
 sub lddlflags { __PACKAGE__->libs }
 
 sub libs {
   shift->_update_supported;
-  return join ' ', @{$supported->{$OS}{libs} || $supported->{$CCNAME}{libs} || []};
+  return join ' ', @{$profile->{libs} || []};
+}
+
+sub compiler_family {
+  shift->_update_supported;
+  return $profile->{family};
 }
 
 sub unsupported {
   my ($self, $build) = (shift, shift);
+  my $family = eval { $self->compiler_family } || 'unknown';
+  my @msg = ("Compiler '$CCNAME' ($family) does not have a supported OpenMP configuration");
 
-  # build an array of messages
-  my @msg = ("This version of $CCNAME does not support OpenMP");
-  if ($CCNAME eq 'gcc' and $OS ne 'darwin') {
-    push @msg, "This could be a bug, please record an issue https://github.com/Perl-OpenMP/p5-Alien-OpenMP/issues";
+  if ($OS eq 'darwin' && $family eq 'clang') {
+    push @msg, 'Apple Clang requires an OpenMP runtime such as Homebrew or MacPorts libomp';
+    push @msg, '    brew install libomp';
+    push @msg, '    port install libomp';
   }
 
-  if ($OS eq 'darwin') {
-    push @msg, "Support can be enabled by using Homebrew or Macports (https://clang-omp.github.io)";
-    push @msg, "    brew install libomp (Homebrew https://brew.sh)";
-    push @msg, "    port install libomp (Macports https://www.macports.org)";
-  }
-
-  # report messages using appropriate method
   if (ref($build)) {
     return if $build->install_prop->{alien_openmp_compiler_has_openmp};
     unshift @msg, "phase = @{[$build->meta->{phase}]}";
@@ -76,18 +71,15 @@ sub unsupported {
 
 sub version_from_preprocessor {
   my ($self, $lines) = @_;
-  my $define_re = qr/^(?:.*_OPENMP\s)?([0-9]+)$/;
-  my %runtime;
-  ($runtime{openmp_version}) = map { (my $v = $_) =~ s/$define_re/$1/; $v } grep /$define_re/, split m{$/}, $lines;
-  $runtime{version} = _openmp_defined($runtime{openmp_version});
-  return \%runtime;
+  my ($define) = $lines =~ /^\s*#\s*define\s+_OPENMP\s+([0-9]+)\b/m;
+  return {
+    openmp_version => $define,
+    version        => _openmp_defined($define),
+  };
 }
 
 sub _openmp_defined {
   my $define = pop;
-
-  # From https://github.com/jeffhammond/HPCInfo/blob/master/docs/Preprocessor-Macros.md
-  # also https://www.openmp.org/specifications/
   my $versions = {
     200505 => '2.5',
     200805 => '3.0',
@@ -102,65 +94,156 @@ sub _openmp_defined {
   return $versions->{$define || ''} || 'unknown';
 }
 
-# test support only
-sub _reset { $checked = 0; }
+sub _reset {
+  $checked = 0;
+  $profile = undef;
+}
 
 sub _update_supported {
   return if $checked;
   require File::Basename;
 
-  # handles situation where $CCNAME is gcc as part of a path
-  $CCNAME = File::Basename::basename($CCNAME);
+  my $command = $CCNAME || q{};
+  my $basename = File::Basename::basename($command);
+  my $family = $COMPILER_FAMILY || _compiler_flavour();
 
-  if ($OS eq 'darwin') {
-    require File::Which;
-    require Path::Tiny;
+  $profile = {
+    known        => 0,
+    family       => $family,
+    cflags       => [],
+    libs         => [],
+    auto_include => '#include <omp.h>',
+  };
 
-    # The issue here is that ccname=gcc and cc=cc as an interface to clang
-    # First check if clang/gcc, then discern omp location
-    my $flavour = _compiler_flavour();
-    if ($flavour eq 'clang' || $flavour eq 'default') {
-      $supported->{darwin} = {cflags => ['-Xclang', '-fopenmp'], libs => ['-lomp'],};
-      $supported->{$CCNAME} ||= {auto_include => join qq{\n}, ('#include <omp.h>')};
-    }
-    elsif ($flavour eq 'gcc') {
-      $supported->{darwin} = {cflags => ['-fopenmp'], libs => ['-lomp'],};
-      $supported->{$CCNAME} ||= {auto_include => join qq{\n}, ('#include <omp.h>')};
+  if ($family eq 'gcc') {
+    # GCC has used -fopenmp to enable compilation and runtime linkage since
+    # its original OpenMP support.  This is also correct for GNU GCC on macOS.
+    $profile->{known}  = 1;
+    $profile->{cflags} = ['-fopenmp'];
+    $profile->{libs}   = ['-fopenmp'];
+  }
+  elsif ($family eq 'clang') {
+    $profile->{known} = 1;
+    if ($OS eq 'darwin') {
+      $profile->{cflags} = [ '-Xclang', '-fopenmp' ];
+      $profile->{libs}   = ['-lomp'];
+      _add_darwin_libomp_paths($profile);
     }
     else {
-      return ++$checked;
+      # Upstream LLVM Clang accepts -fopenmp directly.  Probe::CBuilder is the
+      # final authority and will reject installations lacking headers/runtime.
+      $profile->{cflags} = ['-fopenmp'];
+      $profile->{libs}   = ['-fopenmp'];
     }
+  }
 
-    if (my $mp = File::Which::which('port')) {
-
-      # macports /opt/local/bin/port
-      my $mp_prefix = Path::Tiny->new($mp)->parent->parent;
-      push @{$supported->{darwin}{cflags}}, "-I$mp_prefix/include/libomp";
-      unshift @{$supported->{darwin}{libs}}, "-L$mp_prefix/lib/libomp";
-    }
-    else {
-      # homebrew has the headers and library in /usr/local, but is not always symlinked
-      push @{$supported->{darwin}{cflags}}, "-I/usr/local/include", "-I/opt/homebrew/opt/libomp/include";
-      unshift @{$supported->{darwin}{libs}}, "-L/usr/local/lib", "-L/opt/homebrew/opt/libomp/lib";
-    }
-  }
-  elsif ($OS eq 'freebsd') {
-    $CCNAME = 'clang';
-  }
-  # covers case where "CCNAME" is "cc" but it's still "gcc"; the alternative is to add
-  # 'cc' to the supported hash above, which seems to restrictive
-  elsif ($CCNAME eq "cc") {
-     $CCNAME = 'gcc' if defined $Config::Config{gccversion};
-  }
+  # Keep basename available for diagnostics without using it as the primary
+  # compiler-family detector.  This supports gcc-16, target-prefixed gcc, etc.
+  $CCNAME = $command;
   $checked++;
 }
 
-# not looking for openmp
+sub _add_darwin_libomp_paths {
+  my ($p) = @_;
+  require File::Which;
+  require Path::Tiny;
+
+  if (my $brew = File::Which::which('brew')) {
+    my $prefix = qx{$brew --prefix libomp 2>/dev/null};
+    chomp $prefix;
+    if ($prefix) {
+      push @{$p->{cflags}}, "-I$prefix/include";
+      unshift @{$p->{libs}}, "-L$prefix/lib";
+      return;
+    }
+  }
+
+  if (my $port = File::Which::which('port')) {
+    my $prefix = Path::Tiny->new($port)->parent->parent;
+    push @{$p->{cflags}}, "-I$prefix/include/libomp";
+    unshift @{$p->{libs}}, "-L$prefix/lib/libomp";
+    return;
+  }
+
+  # Conservative fallbacks for conventional Intel/Apple-Silicon Homebrew.
+  push @{$p->{cflags}}, '-I/usr/local/opt/libomp/include', '-I/opt/homebrew/opt/libomp/include';
+  unshift @{$p->{libs}}, '-L/usr/local/opt/libomp/lib', '-L/opt/homebrew/opt/libomp/lib';
+}
+
 sub _compiler_flavour {
-  my $defines = qx{$CCNAME -dM -E - < /dev/null};
-  return 'clang' if ($defines =~ m{^#define __clang__}m);
-  return 'gcc'   if ($defines =~ m{^#define __GCC_}m && $defines =~ m{^#define __APPLE__}m);
-  return 'default';
+  my $defines = _compiler_defines();
+  return _compiler_family_from_defines($defines);
+}
+
+sub _compiler_family_from_defines {
+  my ($defines) = @_;
+  return 'clang' if $defines =~ /^\s*#\s*define\s+__clang__\b/m;
+  return 'gcc'   if $defines =~ /^\s*#\s*define\s+__GNUC__\b/m;
+  return 'unknown';
+}
+
+sub _openmp_defines {
+  my ($self) = @_;
+  require Text::ParseWords;
+  my @flags = Text::ParseWords::shellwords($self->cflags || q{});
+  return _compiler_defines(@flags);
+}
+
+sub _compiler_defines {
+  my @extra = @_;
+
+  require File::Temp;
+  require IPC::Open3;
+  require Text::ParseWords;
+
+  my @cc = Text::ParseWords::shellwords($CCNAME || q{});
+  return q{} unless @cc;
+
+  # Do not drive the preprocessor through stdin.  Strawberry Perl/MinGW GCC
+  # can hang when gcc's stdin/stdout/stderr are all connected to open3 pipes.
+  # Use a real temporary C file and direct stdout/stderr to temporary files.
+  # Passing already-open output handles to open3 avoids pipe-buffer deadlocks.
+  my ($source_fh, $source) = File::Temp::tempfile(SUFFIX => '.c', UNLINK => 0);
+  print {$source_fh} "\n";
+  close $source_fh;
+
+  my ($out_fh, $out_name) = File::Temp::tempfile(UNLINK => 1);
+  my ($err_fh, $err_name) = File::Temp::tempfile(UNLINK => 1);
+
+  my $in;
+  my $out = '>&' . fileno($out_fh);
+  my $err = '>&' . fileno($err_fh);
+  my $pid = eval {
+    IPC::Open3::open3(
+      $in,
+      $out,
+      $err,
+      @cc,
+      @extra,
+      qw(-dM -E),
+      $source,
+    );
+  };
+  unless ($pid) {
+    unlink $source;
+    close $out_fh;
+    close $err_fh;
+    return q{};
+  }
+
+  close $in if $in;
+  waitpid $pid, 0;
+  my $status = $?;
+  unlink $source;
+
+  seek $out_fh, 0, 0 or return q{};
+  local $/;
+  my $defines = <$out_fh> || q{};
+
+  close $out_fh;
+  close $err_fh;
+
+  return $status == 0 ? $defines : q{};
 }
 
 1;
@@ -171,60 +254,53 @@ sub _compiler_flavour {
 
 Alien::OpenMP::configure - Install time configuration helper
 
-=head1 SYNOPSIS
-
-  # alienfile
-  use Alien::OpenMP::configure;
-
-  if (!Alien::OpenMP::configure->is_known) {
-    Alien::OpenMP::configure->unsupported(__PACKAGE__);
-    exit;
-  }
-
-  plugin 'Probe::CBuilder' => (
-    cflags  => Alien::OpenMP::configure->cflags,
-    libs    => Alien::OpenMP::configure->libs,
-    ...
-  );
-
 =head1 DESCRIPTION
 
-L<Alien::OpenMP::configure> is storage for the compiler flags required for multiple compilers on multiple systems and
-an attempt to intelligently support them.
+Internal helper for identifying the C compiler configured into the running
+Perl and supplying the OpenMP flags used by Alien::OpenMP.  Compiler family
+is detected from predefined compiler macros rather than executable names, so
+versioned and target-prefixed GCC drivers are handled without special cases.
 
-This module is designed to be used by the L<Alien::OpenMP::configure> authors and contributors, rather than end users.
+The running Perl's C<$Config{cc}> is authoritative.  C<ENV{CC}> is deliberately
+not used to switch toolchains because normal XS and Inline::C builds inherit
+Perl's configured compiler and ABI settings.
 
 =head1 METHODS
 
-L<Alien::OpenMP::configure> implements the following methods.
+=head2 auto_include
+
+Return the OpenMP include inserted for Inline::C.
 
 =head2 cflags
 
-Obtain the compiler flags for the compiler and architecture suitable for passing as C<cflags> to
-L<Alien::Build::Plugin::Probe::CBuilder>.
+Return compiler flags that enable OpenMP.
+
+=head2 compiler_family
+
+Return C<gcc>, C<clang>, or C<unknown> for the configured compiler.
 
 =head2 is_known
 
-Return a Boolean to indicate whether the compiler is known to this module.
+Return true when this compiler/platform has a known OpenMP configuration.
+The subsequent compile/link probe remains the final capability check.
 
 =head2 lddlflags
 
-A synonym for L</"libs">.
+A synonym for L</libs>.
 
 =head2 libs
 
-Obtain the compiler flags for the compiler and architecture suitable for passing as C<libs> to
-L<Alien::Build::Plugin::Probe::CBuilder>.
+Return link flags needed for the OpenMP runtime.
 
 =head2 unsupported
 
-Report using L<Alien::Build::Log> or L<warn|https://metacpan.org/pod/perlfunc#warn-LIST> that the compiler/architecture
-combination is unsupported and provide minimal notes on any solutions. There is little to no guarding of the actual
-state of support in this function.
+Report an unsupported compiler/platform combination.
 
 =head2 version_from_preprocessor
 
-Parse the output from the C preprocessor, filtering for the C<#define _OPENMP> to populate a hash with both the value
-and the equivalent decimal version. The keys of the hash are C<openmp_version> and C<version>.
+Parse C<#define _OPENMP> from preprocessor output and return both its dated
+value and the corresponding OpenMP specification version.  This indicates the
+specification date advertised by the compiler; it is not a guarantee that every
+feature in that specification is implemented.
 
 =cut

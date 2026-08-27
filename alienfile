@@ -1,6 +1,5 @@
 # -*- mode: perl -*-
 use alienfile 1.68;
-use Alien::Build::CommandSequence;
 use lib q{lib};
 use Alien::OpenMP::configure;
 
@@ -11,7 +10,7 @@ configure {
   }
   unless (Alien::OpenMP::configure->is_known) {
     Alien::OpenMP::configure->unsupported(__PACKAGE__);
-    die "Unsupported platform (no OpenMP)";
+    die "Unsupported platform/compiler combination (no known OpenMP configuration)";
   }
 };
 
@@ -27,41 +26,35 @@ plugin 'Probe::CBuilder' => (
 
 after probe => sub {
   my $build = shift;
-  $build->install_prop->{'alien_openmp_compiler_has_openmp'} = 1;
+  $build->install_prop->{alien_openmp_compiler_has_openmp} = 1;
   $build->runtime_prop->{auto_include} = Alien::OpenMP::configure->auto_include;
   $build->runtime_prop->{version} = $Alien::OpenMP::VERSION;
 
-  my $seq = Alien::Build::CommandSequence->new([
-    join(' ', '%{cc}', '-dM', Alien::OpenMP::configure->cflags, '-E', '-', '<', '%{devnull}'),
-    sub {
-      my ($build, $args) = @_;
-      my @props = qw{openmp_version version};
-      my $runtime = Alien::OpenMP::configure->version_from_preprocessor($args->{out});
-      @{$build->runtime_prop}{@props} = @$runtime{@props};
-    }
-  ]);
-  $seq->execute($build);
+  # Reuse the same shell-free preprocessor capture used for compiler-family
+  # detection.  This avoids shell redirection and stdin-pipe behavior on
+  # Windows while retaining the enabled OpenMP flags for _OPENMP detection.
+  my $defines = Alien::OpenMP::configure->_openmp_defines;
+  my @props = qw{openmp_version version};
+  my $runtime = Alien::OpenMP::configure->version_from_preprocessor($defines);
+  @{$build->runtime_prop}{@props} = @$runtime{@props};
 };
 
 share {
   before download => sub {
     my $build = shift;
     Alien::OpenMP::configure->unsupported($build);
-    die "Unsupported platform, OpenMP will not be built";
+    die "Unsupported platform/compiler combination; OpenMP will not be built";
   };
 };
 
 __DATA__
-/* OpenMP detection test program */
+/* OpenMP detection test program.  Do not require a particular thread count:
+ * runtime policy (OMP_DYNAMIC, OMP_THREAD_LIMIT, containers, schedulers, etc.)
+ * must not make compiler/runtime detection fail. */
 #include <omp.h>
-int main () {
-  omp_set_num_threads(3);
-  int ans = 42;
-#pragma omp parallel
-#pragma omp master
-  ans = omp_get_num_threads();
-  if (3 == ans)
-    return 0;
-  return 1;
+#ifndef _OPENMP
+# error OpenMP was not enabled by the compiler
+#endif
+int main(void) {
+  return omp_get_max_threads() < 1;
 }
-
