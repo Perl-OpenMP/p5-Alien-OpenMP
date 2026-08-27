@@ -10,11 +10,11 @@ clean2:
 	rm -rf blib
 
 test: clean
-	dzil test	
+	dzil test
 
 prepare: clean
-	dzil build 
-	mv -vf *.tar.gz ./releases/ 
+	dzil build
+	mv -vf *.tar.gz ./releases/
 	dzil clean
 	git add ./releases/*.tar.gz
 	git status
