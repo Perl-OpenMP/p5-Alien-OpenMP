@@ -1,32 +1,84 @@
-name: gcc-sweep
-on: [push, pull_request]
+name: perl-gcc-matrix
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
-  gcc:
+  linux-perl-gcc:
+    name: Perl ${{ matrix.perl }} / GCC ${{ matrix.gcc }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+
     strategy:
       fail-fast: false
+      max-parallel: 24
       matrix:
-        gcc: ['10', '11', '12', '13', '14', '15', '16']
-    container:
-      image: gcc:${{ matrix.gcc }}
+        perl:
+          - '5.12.5'
+          - '5.14.4'
+          - '5.16.3'
+          - '5.18.4'
+          - '5.20.3'
+          - '5.22.4'
+          - '5.24.4'
+          - '5.26.3'
+          - '5.28.3'
+          - '5.30.3'
+          - '5.32.1'
+          - '5.34.3'
+          - '5.36.3'
+          - '5.38.5'
+          - '5.40.5'
+          - '5.42.3'
+          - '5.44.0'
+        gcc:
+          - '4.8'
+          - '4.9'
+          - '5'
+          - '6'
+          - '7'
+          - '8'
+          - '9'
+          - '10'
+          - '11'
+          - '12'
+          - '13'
+          - '14'
+          - '15'
+          - '16'
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Perl build dependencies
-        run: apt-get update && apt-get install -y curl make ca-certificates
-      - name: Build Perl with matrix GCC
+      - uses: actions/checkout@v6
+
+      # Download on the current Ubuntu runner rather than inside the GCC
+      # container.  This keeps old gcc:4.8/4.9 userspaces away from modern
+      # GitHub Actions/Node requirements and avoids old TLS stacks.
+      - name: Download Perl source and cpanm
+        shell: bash
         run: |
-          curl -L https://www.cpan.org/src/5.0/perl-5.42.0.tar.gz -o /tmp/perl.tar.gz
-          tar -C /tmp -xzf /tmp/perl.tar.gz
-          cd /tmp/perl-5.42.0
-          ./Configure -des -Dprefix=/opt/perl -Dcc=gcc
-          make -j2
-          make install
-          /opt/perl/bin/perl -V:cc -V:gccversion
-      - name: Install dependencies and test
+          set -euxo pipefail
+          curl --fail --location --retry 3 \
+            "https://www.cpan.org/src/5.0/perl-${{ matrix.perl }}.tar.gz" \
+            -o "$RUNNER_TEMP/perl-${{ matrix.perl }}.tar.gz"
+          curl --fail --location --retry 3 \
+            "https://cpanmin.us/" \
+            -o "$RUNNER_TEMP/cpanm"
+
+      - name: Pull GCC ${{ matrix.gcc }}
+        shell: bash
+        run: docker pull "gcc:${{ matrix.gcc }}"
+
+      - name: Test Perl ${{ matrix.perl }} with GCC ${{ matrix.gcc }}
+        shell: bash
+        env:
+          PERL_VERSION: ${{ matrix.perl }}
+          GCC_VERSION: ${{ matrix.gcc }}
         run: |
-          /opt/perl/bin/cpan -T App::cpanminus
-          /opt/perl/bin/cpanm -n --installdeps .
-          /opt/perl/bin/perl Makefile.PL
-          make -j2
-          /opt/perl/bin/prove -brv t
+          set -euxo pipefail
+          docker run --rm \
+            -e PERL_VERSION \
+            -e GCC_VERSION \
+            -e JOBS=2 \
+            -v "$GITHUB_WORKSPACE:/src:ro" \
+            -v "$RUNNER_TEMP:/ci:ro" \
+            "gcc:${GCC_VERSION}" \
+            bash /src/.github/bin/test-perl-gcc.sh
+

@@ -21,6 +21,8 @@
 - Replace stale CI with explicit Linux GCC, Linux Clang, Strawberry Windows,
   Apple Clang/macOS, and FreeBSD coverage
 - Add a GCC 10 through GCC 16 compiler sweep using Perls built by each GCC
+- Bootstrap Dist::Zilla in CI before testing the author source tree; Makefile.PL
+  is generated and is not stored in the repository
 
 0.3.8  2025-04-02 20:04:34+01:00 Europe/London
 - Added support for FreeBSD, using FreeBSD 14

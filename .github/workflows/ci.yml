@@ -5,69 +5,121 @@ jobs:
   linux-gcc:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: shogo82148/actions-setup-perl@v1
         with:
           perl-version: '5.42'
-      - run: cpanm -n --installdeps .
-      - run: perl -V:cc -V:gccversion
-      - run: perl Makefile.PL && make -j2 && prove -brv t
+      - name: Install distribution and test dependencies
+        run: |
+          cpanm -n Alien::Build Inline::C Test::Alien Test::Needs Capture::Tiny File::Which Path::Tiny
+      - name: Show Perl compiler
+        run: |
+          perl -V:cc -V:gccversion
+          gcc --version
+      - name: Prepare CI Makefile.PL
+        run: cp .github/Makefile.PL.ci Makefile.PL
+      - name: Test distribution
+        run: |
+          perl Makefile.PL
+          make -j2
+          make test TEST_VERBOSE=1
 
   linux-clang:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y clang libomp-dev curl make
       - name: Build Perl with Clang
+        shell: bash
         run: |
           curl -L https://www.cpan.org/src/5.0/perl-5.42.0.tar.gz -o /tmp/perl.tar.gz
           tar -C /tmp -xzf /tmp/perl.tar.gz
           cd /tmp/perl-5.42.0
-          ./Configure -des -Dprefix=$HOME/perl-clang -Dcc=clang
+          ./Configure -des -Dprefix="$HOME/perl-clang" -Dcc=clang
           make -j2
           make install
           echo "$HOME/perl-clang/bin" >> "$GITHUB_PATH"
-      - run: $HOME/perl-clang/bin/cpan -T App::cpanminus
-      - run: $HOME/perl-clang/bin/cpanm -n --installdeps .
-      - run: $HOME/perl-clang/bin/perl -V:cc -V:ccversion
-      - run: $HOME/perl-clang/bin/perl Makefile.PL && make -j2 && $HOME/perl-clang/bin/prove -brv t
+      - name: Install cpanminus
+        run: $HOME/perl-clang/bin/cpan -T App::cpanminus
+      - name: Install distribution and test dependencies
+        run: |
+          cpanm -n Alien::Build Inline::C Test::Alien Test::Needs Capture::Tiny File::Which Path::Tiny
+      - name: Show Perl compiler
+        run: |
+          perl -V:cc -V:ccversion
+          clang --version
+      - name: Prepare CI Makefile.PL
+        run: cp .github/Makefile.PL.ci Makefile.PL
+      - name: Test distribution
+        run: |
+          perl Makefile.PL
+          make -j2
+          make test TEST_VERBOSE=1
 
   windows-strawberry:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: shogo82148/actions-setup-perl@v1
         with:
           distribution: strawberry
           perl-version: '5.42'
-      - run: cpanm -n --installdeps .
-      - run: perl -V:cc -V:gccversion
-      - shell: cmd
-        run: perl Makefile.PL && gmake && prove -brv t
+      - name: Install distribution and test dependencies
+        run: cpanm -n Alien::Build Inline::C Test::Alien Test::Needs Capture::Tiny File::Which Path::Tiny
+      - name: Show Perl compiler
+        run: perl -V:cc -V:gccversion
+      - name: Prepare CI Makefile.PL
+        shell: pwsh
+        run: Copy-Item .github/Makefile.PL.ci Makefile.PL
+      - name: Test distribution
+        shell: cmd
+        run: |
+          perl Makefile.PL
+          gmake
+          gmake test TEST_VERBOSE=1
 
   macos-apple-clang:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: brew install perl libomp
-      - run: echo "$(brew --prefix perl)/bin" >> "$GITHUB_PATH"
-      - run: "$(brew --prefix perl)/bin/cpan" -T App::cpanminus
-      - run: "$(brew --prefix perl)/bin/cpanm" -n --installdeps .
-      - run: "$(brew --prefix perl)/bin/perl" -V:cc -V:ccversion
-      - run: "$(brew --prefix perl)/bin/perl" Makefile.PL && make -j2 && "$(brew --prefix perl)/bin/prove" -brv t
+      - uses: actions/checkout@v6
+      - name: Install Perl and libomp
+        run: brew install perl libomp
+      - name: Add Homebrew Perl to PATH
+        shell: bash
+        run: |
+          echo "$(brew --prefix perl)/bin" >> "$GITHUB_PATH"
+      - name: Install cpanminus
+        run: cpan -T App::cpanminus
+      - name: Install distribution and test dependencies
+        run: |
+          cpanm -n Alien::Build Inline::C Test::Alien Test::Needs Capture::Tiny File::Which Path::Tiny
+      - name: Show Perl compiler
+        run: |
+          perl -V:cc -V:ccversion
+          clang --version
+          brew --prefix libomp
+      - name: Prepare CI Makefile.PL
+        run: cp .github/Makefile.PL.ci Makefile.PL
+      - name: Test distribution
+        run: |
+          perl Makefile.PL
+          make -j2
+          make test TEST_VERBOSE=1
 
   freebsd-clang:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: vmactions/freebsd-vm@v1
         with:
           usesh: true
           prepare: pkg install -y perl5 p5-App-cpanminus gmake
           run: |
             perl -V:cc -V:ccversion
-            cpanm -n --installdeps .
+            cc --version
+            cpanm -n Alien::Build Inline::C Test::Alien Test::Needs Capture::Tiny File::Which Path::Tiny
+            cp .github/Makefile.PL.ci Makefile.PL
             perl Makefile.PL
-            gmake -j2
-            prove -brv t
+            gmake
+            gmake test TEST_VERBOSE=1

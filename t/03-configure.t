@@ -62,8 +62,8 @@ subtest 'unknown is unsupported' => sub {
   local $Alien::OpenMP::configure::COMPILER_FAMILY = 'unknown';
   Alien::OpenMP::configure->_reset;
   ok !Alien::OpenMP::configure->is_known, 'not known';
-  is Alien::OpenMP::configure->cflags, q{}, 'empty cflags';
-  is Alien::OpenMP::configure->libs, q{}, 'empty libs';
+  is(Alien::OpenMP::configure->cflags, q{}, 'empty cflags');
+  is(Alien::OpenMP::configure->libs, q{}, 'empty libs');
   my ($stdout, $stderr) = capture { Alien::OpenMP::configure->unsupported };
   like $stdout, qr/^OS Unsupported/, 'MakeMaker-compatible unsupported marker';
   like $stderr, qr/xyz-cc/, 'diagnostic names compiler';
@@ -79,3 +79,4 @@ subtest 'preprocessor parsing' => sub {
 };
 
 done_testing;
+
