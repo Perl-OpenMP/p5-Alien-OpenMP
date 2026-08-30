@@ -6,7 +6,7 @@ use parent 'Alien::Base';
 use Config ();
 use Alien::OpenMP::configure ();
 
-our $VERSION = '0.3.9';
+our $VERSION = '0.3.10';
 
 sub lddlflags { shift->libs }
 sub openmp_version { shift->runtime_prop->{openmp_version} }

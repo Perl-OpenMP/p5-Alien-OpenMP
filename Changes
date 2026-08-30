@@ -1,3 +1,31 @@
+0.3.10 2026-08-27
+- Harden compiler selection by using the compiler configured into the running
+  Perl rather than allowing ENV{CC} to silently select a different toolchain
+- Detect GCC and Clang from predefined compiler macros instead of executable
+  names, covering versioned and target-prefixed GCC driver names
+- Keep GNU GCC on macOS on the GCC/libgomp -fopenmp toolchain instead of
+  mixing it with LLVM -lomp
+- Stop forcing every FreeBSD compiler to Clang; use the compiler actually
+  configured into Perl
+- Use upstream Clang's -fopenmp profile outside macOS and retain Apple Clang
+  libomp handling on macOS
+- Prefer `brew --prefix libomp` for macOS libomp discovery, with MacPorts and
+  conventional Homebrew paths as fallbacks
+- Make the install capability probe independent of a requested OpenMP thread
+  count so runtime/site policy does not cause false negatives
+- Reduce high-thread-count Inline::C regression tests to portable 1/2/4-thread
+  checks
+- Expand regression tests for compiler-family detection, GCC driver naming,
+  Darwin GCC runtime selection, FreeBSD GCC/Clang selection, and OpenMP macro
+  parsing
+- Replace stale CI with explicit Linux GCC, Linux Clang, Strawberry Windows,
+  Apple Clang/macOS, and FreeBSD coverage
+- Add a GCC 10 through GCC 16 compiler sweep using Perls built by each GCC
+- Bootstrap Dist::Zilla in CI before testing the author source tree; Makefile.PL
+  is generated and is not stored in the repository
+- restored the version declaration in Alien::OpenMP::configure so
+  PAUSE can correctly index the package
+
 0.3.9  2026-08-27
 - Harden compiler selection by using the compiler configured into the running
   Perl rather than allowing ENV{CC} to silently select a different toolchain

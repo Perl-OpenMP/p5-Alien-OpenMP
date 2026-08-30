@@ -3,6 +3,8 @@ use strict;
 use warnings;
 use Config;
 
+our $VERSION = '0.3.10';
+
 # Alien::OpenMP describes the extension toolchain of the running Perl.
 # Do not silently let ENV{CC} select a compiler different from Config{cc};
 # downstream XS/Inline tooling normally returns to Perl's configured compiler.
