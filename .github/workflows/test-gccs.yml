@@ -39,40 +39,15 @@ jobs:
         run: |
           set -euxo pipefail
 
-          family="$(
-            perl -Ilib -MAlien::OpenMP::configure -e '
-              my ($cc) = @ARGV;
-              local $Alien::OpenMP::configure::CCNAME = $cc;
-              local $Alien::OpenMP::configure::COMPILER_FAMILY;
-              Alien::OpenMP::configure->_reset;
-              print Alien::OpenMP::configure->compiler_family;
-            ' "$CC_UNDER_TEST"
-          )"
+          IFS=$'\t' read -r family cflags libs < <(
+            perl .github/bin/compiler-profile.pl "$CC_UNDER_TEST"
+          )
+
           test "$family" = gcc
-
-          cflags="$(
-            perl -Ilib -MAlien::OpenMP::configure -e '
-              my ($cc) = @ARGV;
-              local $Alien::OpenMP::configure::CCNAME = $cc;
-              local $Alien::OpenMP::configure::COMPILER_FAMILY;
-              Alien::OpenMP::configure->_reset;
-              print Alien::OpenMP::configure->cflags;
-            ' "$CC_UNDER_TEST"
-          )"
-          libs="$(
-            perl -Ilib -MAlien::OpenMP::configure -e '
-              my ($cc) = @ARGV;
-              local $Alien::OpenMP::configure::CCNAME = $cc;
-              local $Alien::OpenMP::configure::COMPILER_FAMILY;
-              Alien::OpenMP::configure->_reset;
-              print Alien::OpenMP::configure->libs;
-            ' "$CC_UNDER_TEST"
-          )"
-
           test "$cflags" = '-fopenmp'
           test "$libs" = '-fopenmp'
 
-          cat > "$RUNNER_TEMP/openmp-probe.c" <<'EOF'
+          cat > "$RUNNER_TEMP/openmp-probe.c" <<'EOF_C'
           #include <omp.h>
           #include <stdio.h>
           int main(void) {
@@ -83,7 +58,7 @@ jobs:
             return omp_get_max_threads() < 1;
           #endif
           }
-          EOF
+          EOF_C
 
           "$CC_UNDER_TEST" $cflags "$RUNNER_TEMP/openmp-probe.c" $libs -o "$RUNNER_TEMP/openmp-probe"
           OMP_NUM_THREADS=2 "$RUNNER_TEMP/openmp-probe"
@@ -114,33 +89,9 @@ jobs:
         run: |
           set -euxo pipefail
 
-          family="$(
-            perl -Ilib -MAlien::OpenMP::configure -e '
-              my ($cc) = @ARGV;
-              local $Alien::OpenMP::configure::CCNAME = $cc;
-              local $Alien::OpenMP::configure::COMPILER_FAMILY;
-              Alien::OpenMP::configure->_reset;
-              print Alien::OpenMP::configure->compiler_family;
-            ' "$CC_UNDER_TEST"
-          )"
-          cflags="$(
-            perl -Ilib -MAlien::OpenMP::configure -e '
-              my ($cc) = @ARGV;
-              local $Alien::OpenMP::configure::CCNAME = $cc;
-              local $Alien::OpenMP::configure::COMPILER_FAMILY;
-              Alien::OpenMP::configure->_reset;
-              print Alien::OpenMP::configure->cflags;
-            ' "$CC_UNDER_TEST"
-          )"
-          libs="$(
-            perl -Ilib -MAlien::OpenMP::configure -e '
-              my ($cc) = @ARGV;
-              local $Alien::OpenMP::configure::CCNAME = $cc;
-              local $Alien::OpenMP::configure::COMPILER_FAMILY;
-              Alien::OpenMP::configure->_reset;
-              print Alien::OpenMP::configure->libs;
-            ' "$CC_UNDER_TEST"
-          )"
+          IFS=$'\t' read -r family cflags libs < <(
+            perl .github/bin/compiler-profile.pl "$CC_UNDER_TEST"
+          )
 
           test "$family" = gcc
           test "$cflags" = '-fopenmp'
@@ -149,14 +100,14 @@ jobs:
             *-lomp*) exit 1 ;;
           esac
 
-          cat > "$RUNNER_TEMP/openmp-probe.c" <<'EOF'
+          cat > "$RUNNER_TEMP/openmp-probe.c" <<'EOF_C'
           #include <omp.h>
           #include <stdio.h>
           int main(void) {
             printf("_OPENMP=%d max_threads=%d\n", _OPENMP, omp_get_max_threads());
             return omp_get_max_threads() < 1;
           }
-          EOF
+          EOF_C
 
           "$CC_UNDER_TEST" -fopenmp "$RUNNER_TEMP/openmp-probe.c" -fopenmp -o "$RUNNER_TEMP/openmp-probe"
           OMP_NUM_THREADS=2 "$RUNNER_TEMP/openmp-probe"
@@ -196,24 +147,9 @@ jobs:
         run: |
           set -euxo pipefail
 
-          family="$(
-            perl -Ilib -MAlien::OpenMP::configure -e '
-              my ($cc) = @ARGV;
-              local $Alien::OpenMP::configure::CCNAME = $cc;
-              local $Alien::OpenMP::configure::COMPILER_FAMILY;
-              Alien::OpenMP::configure->_reset;
-              print Alien::OpenMP::configure->compiler_family;
-            ' "$CC_UNDER_TEST"
-          )"
-          cflags="$(
-            perl -Ilib -MAlien::OpenMP::configure -e '
-              my ($cc) = @ARGV;
-              local $Alien::OpenMP::configure::CCNAME = $cc;
-              local $Alien::OpenMP::configure::COMPILER_FAMILY;
-              Alien::OpenMP::configure->_reset;
-              print Alien::OpenMP::configure->cflags;
-            ' "$CC_UNDER_TEST"
-          )"
+          IFS=$'\t' read -r family cflags libs < <(
+            perl .github/bin/compiler-profile.pl "$CC_UNDER_TEST"
+          )
 
           test "$family" = clang
           test "$cflags" = '-fopenmp'
